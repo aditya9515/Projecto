@@ -8,6 +8,7 @@ import {
   Square,
   SquareArrowOutUpRight,
   Star,
+  TerminalSquare,
   TriangleAlert,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -23,6 +24,7 @@ type ProjectCardProps = {
   onStopProject: (project: Project) => void;
   onOpenFolder: (project: Project) => void;
   onOpenEditor: (project: Project) => void;
+  onRevealTerminal?: (project: Project) => void;
   onToggleFavorite: (project: Project) => void;
   onConfigureLaunch?: (project: Project) => void;
   launchState?: ProjectLaunchButtonState;
@@ -33,6 +35,7 @@ export function ProjectCard({
   onStopProject,
   onOpenFolder,
   onOpenEditor,
+  onRevealTerminal,
   onToggleFavorite,
   onConfigureLaunch,
   launchState = project.missingFolder || project.launchProfiles.length === 0
@@ -166,11 +169,16 @@ export function ProjectCard({
         </Button>{" "}
         <Button onClick={() => onOpenFolder(project)} variant="secondary">
           {" "}
-          <FolderOpen className="h-4 w-4" /> Open Folder{" "}
+          <FolderOpen className="h-4 w-4" /> Folder{" "}
         </Button>{" "}
+        {isTerminalMapped && onRevealTerminal ? (
+          <Button onClick={() => onRevealTerminal(project)} variant="secondary">
+            <TerminalSquare className="h-4 w-4" /> Mapped Terminal
+          </Button>
+        ) : null}{" "}
         <Button onClick={() => onOpenEditor(project)} variant="secondary">
           {" "}
-          <SquareArrowOutUpRight className="h-4 w-4" /> Open Editor{" "}
+          <SquareArrowOutUpRight className="h-4 w-4" /> Editor{" "}
         </Button>{" "}
         {onConfigureLaunch ? (
           <Button onClick={() => onConfigureLaunch(project)} variant="secondary">
@@ -181,8 +189,8 @@ export function ProjectCard({
               <Pencil className="h-4 w-4" />
             )}{" "}
             {project.launchProfiles.length === 0
-              ? "Setup Launch"
-              : "Edit Launch"}{" "}
+              ? "Setup"
+              : "Edit"}{" "}
           </Button>
         ) : null}{" "}
       </div>{" "}

@@ -61,7 +61,7 @@ describe("EditorService", () => {
 
   const settings: AppSettings = {
     defaultEditor: "vscode",
-    terminalStrategy: "os-internal",
+    terminalStrategy: "os-external",
     telemetryEnabled: false,
     askBeforeRunningNewCommands: true,
     launchOnStartup: true,

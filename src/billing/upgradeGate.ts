@@ -7,7 +7,7 @@ export const upgradeReasonValues = [
   "bulkImport",
   "workspacePresets",
   "directoryChanges",
-  "standardLaunch",
+  "freeLaunch",
   "lockedProject",
 ] as const;
 
@@ -25,7 +25,7 @@ const reasonCopy: Record<UpgradeReason, UpgradeReasonCopy> = {
   projects: {
     title: "Unlock Unlimited Projects",
     description:
-      "Standard includes up to 5 synced project directories. Pro removes the cap and keeps your workspace flexible across devices.",
+      "Free includes up to 5 synced project directories. Plus removes the cap for larger workspaces.",
     featureBullets: [
       "Unlimited projects",
       "Unlimited concurrent launches",
@@ -33,9 +33,9 @@ const reasonCopy: Record<UpgradeReason, UpgradeReasonCopy> = {
     ],
   },
   concurrentLaunches: {
-    title: "Launch Multiple Projects With Pro",
+    title: "Launch Limit Is 1 On The Free Tier",
     description:
-      "Standard can launch one project workflow at a time. Pro removes the concurrency cap for heavier multi-project setups.",
+      "The free tier allows one active project launch at a time. Stop the current launch, clear any stale session, or upgrade to Plus for unlimited concurrent launches.",
     featureBullets: [
       "Unlimited concurrent launches",
       "Better for fullstack workspaces",
@@ -43,9 +43,9 @@ const reasonCopy: Record<UpgradeReason, UpgradeReasonCopy> = {
     ],
   },
   bulkImport: {
-    title: "Bulk Import Is a Pro Workflow",
+    title: "Bulk Import Is Plus",
     description:
-      "Bulk import and bulk scan are available on Pro for larger workspaces and faster onboarding.",
+      "Bulk import and bulk scan are available on Plus for larger workspaces and faster onboarding.",
     featureBullets: [
       "Smart bulk import",
       "Bulk scan entire workspaces",
@@ -53,7 +53,7 @@ const reasonCopy: Record<UpgradeReason, UpgradeReasonCopy> = {
     ],
   },
   workspacePresets: {
-    title: "Workspace Presets Are Pro",
+    title: "Workspace Presets Need Plus",
     description:
       "Use premium presets to generate polished launch workflows in one click.",
     featureBullets: [
@@ -69,27 +69,27 @@ const reasonCopy: Record<UpgradeReason, UpgradeReasonCopy> = {
     featureBullets: [
       "Refresh desktop subscription state",
       "Retry after reconnecting to the backend",
-      "Project directory edits are included on Standard and Pro",
+      "Project directory edits are included on Free and Plus",
     ],
   },
-  standardLaunch: {
-    title: "Upgrade From Standard",
+  freeLaunch: {
+    title: "Upgrade To Plus",
     description:
-      "Standard keeps Projecto focused: 5 project directories, basic detection, one active launch, and no bulk import. Pro unlocks the full workspace again.",
+      "Free includes 5 projects, basic detection, 1 active launch, and no bulk import. Plus unlocks the full workspace.",
     featureBullets: [
       "Unlimited projects",
       "Unlimited concurrent launches",
       "Advanced detection and bulk import",
-      "Locked Standard projects unlock automatically after Pro is active",
+      "Locked projects unlock automatically after Plus is active",
     ],
   },
   lockedProject: {
-    title: "This Project Is Locked On Standard",
+    title: "This Project Is Locked",
     description:
-      "Standard keeps your 5 most-used projects runnable. This project stays visible and removable, but launching it requires Pro.",
+      "Your 5 most-used projects stay runnable on Free. This project stays visible and removable, but launching it requires Plus.",
     featureBullets: [
       "Upgrade to unlock every project",
-      "Delete projects you no longer need to free a Standard slot",
+      "Delete projects you no longer need to free a slot",
       "Project files on disk are never deleted by Projecto",
     ],
   },
@@ -104,10 +104,10 @@ export function isProPlan(subscription: SubscriptionState): boolean {
 }
 
 export function getPlanDisplayName(plan: SubscriptionState["plan"]): string {
-  return plan === "pro" ? "Pro" : "Standard";
+  return plan === "pro" ? "Plus" : "Free";
 }
 
-export function isStandardAccess(subscription: SubscriptionState): boolean {
+export function isFreeAccess(subscription: SubscriptionState): boolean {
   return !isProPlan(subscription);
 }
 
@@ -161,7 +161,7 @@ export function getMaxConcurrentLaunches(
   return subscription.entitlements?.maxConcurrentLaunches ?? 1;
 }
 
-export function compareProjectsByStandardUsage(
+export function compareProjectsByFreeUsage(
   left: Pick<
     Project,
     "id" | "name" | "launchCount" | "lastOpenedAt" | "updatedAt" | "createdAt"
@@ -193,7 +193,7 @@ export function applySubscriptionProjectAccess(
 ): Project[] {
   const projectLimit = getProjectLimit(subscription);
 
-  if (projectLimit === null || !isStandardAccess(subscription)) {
+  if (projectLimit === null || !isFreeAccess(subscription)) {
     return projects.map((project) => ({
       ...project,
       lockedBySubscription: false,
@@ -205,7 +205,7 @@ export function applySubscriptionProjectAccess(
 
   const ranks = new Map(
     [...projects]
-      .sort(compareProjectsByStandardUsage)
+      .sort(compareProjectsByFreeUsage)
       .map((project, index) => [project.id, index + 1]),
   );
 
@@ -216,7 +216,7 @@ export function applySubscriptionProjectAccess(
     return {
       ...project,
       lockedBySubscription: locked,
-      subscriptionLockReason: locked ? "standard_project_limit" : undefined,
+      subscriptionLockReason: locked ? "free_project_limit" : undefined,
       subscriptionRank: rank,
       subscriptionLimit: projectLimit,
     };
@@ -232,18 +232,34 @@ export function createUpgradeRequiredError(reason: UpgradeReason): Error {
 }
 
 export function parseUpgradeReason(error: unknown): UpgradeReason | null {
-  if (!(error instanceof Error)) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : null;
+
+  if (!message) {
     return null;
   }
 
-  if (!error.message.startsWith(UPGRADE_ERROR_PREFIX)) {
+  const prefixIndex = message.indexOf(UPGRADE_ERROR_PREFIX);
+
+  if (prefixIndex === -1) {
     return null;
   }
 
-  const reason = error.message.slice(UPGRADE_ERROR_PREFIX.length);
-  return upgradeReasonValues.includes(reason as UpgradeReason)
-    ? (reason as UpgradeReason)
-    : null;
+  const reasonText = message.slice(prefixIndex + UPGRADE_ERROR_PREFIX.length);
+  const reason = upgradeReasonValues.find(
+    (value) =>
+      reasonText === value ||
+      reasonText.startsWith(`${value}:`) ||
+      reasonText.startsWith(`${value} `) ||
+      reasonText.startsWith(`${value}\n`) ||
+      reasonText.startsWith(`${value}\r`),
+  );
+
+  return reason ?? null;
 }
 
 export function getUpgradeReasonCopy(reason: UpgradeReason): UpgradeReasonCopy {

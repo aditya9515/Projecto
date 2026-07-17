@@ -29,13 +29,8 @@ describe("shared desktop schemas", () => {
     }
   });
 
-  it("accepts the combined OS and VS Code terminal modes", () => {
-    expect(terminalStrategyValues).toEqual([
-      "os-internal",
-      "os-external",
-      "vscode-internal",
-      "vscode-external",
-    ]);
+  it("accepts the visible OS terminal mode", () => {
+    expect(terminalStrategyValues).toEqual(["os-external"]);
 
     for (const terminalStrategy of terminalStrategyValues) {
       expect(
@@ -66,7 +61,7 @@ describe("shared desktop schemas", () => {
       fromPort: "3000",
       toPort: "3003",
       processId: "34332",
-      executionMode: "os-internal",
+      executionMode: "os-external",
       managed: false,
     });
 
@@ -79,7 +74,7 @@ describe("shared desktop schemas", () => {
       kind: "already-running",
       message: "Another Next.js dev server is already running.",
       timestamp: new Date().toISOString(),
-      executionMode: "os-internal",
+      executionMode: "os-external",
       managed: false,
     });
 

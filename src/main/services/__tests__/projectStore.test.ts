@@ -628,11 +628,11 @@ describe("ProjectStore", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("hydrates active and archived projects and locks only Standard projects beyond the top five by usage", async () => {
+  it("hydrates active and archived projects and locks only Free projects beyond the top five by usage", async () => {
     const userDataDir = await createUserDataDir();
     const workspaces = await Promise.all(
       Array.from({ length: 6 }, (_, index) =>
-        createWorkspace(`standard-rank-${index + 1}`),
+        createWorkspace(`free-rank-${index + 1}`),
       ),
     );
     const store = new ProjectStore(
@@ -696,7 +696,7 @@ describe("ProjectStore", () => {
         lockedBySubscription: true,
         subscriptionRank: 6,
         subscriptionLimit: 5,
-        subscriptionLockReason: "standard_project_limit",
+        subscriptionLockReason: "free_project_limit",
       }),
     );
     expect(byId.get("archived-most")).toEqual(
@@ -711,11 +711,11 @@ describe("ProjectStore", () => {
     );
   });
 
-  it("uses deterministic project names and ids when Standard usage counts tie", async () => {
+  it("uses deterministic project names and ids when Free usage counts tie", async () => {
     const userDataDir = await createUserDataDir();
     const workspaces = await Promise.all(
       ["Alpha", "Beta", "Delta", "Gamma", "Omega", "Zeta"].map((name) =>
-        createWorkspace(`standard-tie-${name}`),
+        createWorkspace(`free-tie-${name}`),
       ),
     );
     const store = new ProjectStore(
@@ -828,7 +828,7 @@ describe("ProjectStore", () => {
       .toBe(true);
   });
 
-  it("blocks Standard project creation at five visible projects and allows it below five", async () => {
+  it("blocks Free project creation at five visible projects and allows it below five", async () => {
     const blockedUserDataDir = await createUserDataDir();
     const blockedWorkspaces = await Promise.all(
       Array.from({ length: 5 }, (_, index) =>
@@ -900,7 +900,7 @@ describe("ProjectStore", () => {
     expect(created.id).toBe("allowed-1");
   });
 
-  it("allows deleting projects that are locked by the Standard project limit", async () => {
+  it("allows deleting projects that are locked by the Free project limit", async () => {
     const userDataDir = await createUserDataDir();
     const workspaces = await Promise.all(
       Array.from({ length: 6 }, (_, index) =>

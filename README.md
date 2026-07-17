@@ -30,7 +30,7 @@ Suggested options:
 - Track Projecto-owned ports so duplicate launches and cross-project port conflicts can be handled safely.
 - Show clear launch states such as Launch, Running, Ready, Stop, Failed, and Locked.
 - Stop running projects from the app and clean up mapped terminal sessions.
-- Keep project metadata visible during subscription downgrades while locking only features that exceed the Standard plan.
+- Keep project metadata visible during subscription downgrades while locking only features that exceed the Free plan.
 - Support offline handling with a full-page reconnect experience.
 - Provide update checks and Windows installer metadata through the hosted Projecto website.
 - Keep the renderer sandboxed behind validated preload APIs and main-process services.
@@ -50,14 +50,14 @@ The desktop app owns local project discovery, launch behavior, terminal sessions
 
 ## Subscription Behavior
 
-Projecto treats the backend `free` plan as the desktop Standard tier and `pro` as Pro.
+Projecto treats the backend `free` plan as the desktop Free tier and `pro` as Pro.
 
-Standard users can:
+Free users can:
 
 - Keep all existing projects visible.
 - Run up to the allowed project limit based on deterministic usage ranking.
 - Delete projects, including locked projects.
-- Continue using core project detection and launch features within the Standard limits.
+- Continue using core project detection and launch features within the Free limits.
 
 Pro users can:
 
@@ -212,7 +212,7 @@ Effective access resolves in this order:
 
 1. Active manual override
 2. Active paid subscription
-3. Standard fallback
+3. Free fallback
 
 ## Production Checklist
 

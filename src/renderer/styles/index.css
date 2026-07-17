@@ -15,7 +15,7 @@
   --muted: 29 79 91; /* #1d4f5b */
   --text: 11 48 56; /* #0b3038 */
   --accent: 82 171 152; /* #52ab98 */
-  --success: 82 171 152;
+  --success: 174 224 214; /* #aee0d6 */
   --warning: 200 216 228;
   --danger: 43 103 119;
   --shadow-soft: none;
@@ -156,15 +156,15 @@ a {
 }
 
 .app-button-primary {
-  border: 1px solid #2b6777;
-  background: #52ab98;
+  border: 1px solid #52ab98;
+  background: #aee0d6;
   color: #0b3038;
   box-shadow: none;
 }
 
 .app-button-primary:hover {
-  background: #2b6777;
-  color: #ffffff;
+  background: #52ab98;
+  color: #0b3038;
   box-shadow: none;
 }
 
@@ -244,15 +244,15 @@ a {
 }
 
 .app-control-selected {
-  background: #2b6777;
-  border-color: #2b6777;
-  color: #ffffff;
+  background: #aee0d6;
+  border-color: #52ab98;
+  color: #0b3038;
 }
 
 .app-control-selected:hover {
-  background: #2b6777;
+  background: #52ab98;
   border-color: #2b6777;
-  color: #ffffff;
+  color: #0b3038;
 }
 
 .app-choice-selected {
@@ -279,8 +279,8 @@ a {
 }
 
 .app-switch-track[data-state='checked'] {
-  background: #52ab98;
-  border-color: #2b6777;
+  background: #aee0d6;
+  border-color: #52ab98;
 }
 
 .app-switch-thumb {
@@ -296,8 +296,8 @@ a {
 }
 
 .app-status-success {
-  background: #52ab98;
-  border-color: #2b6777;
+  background: #aee0d6;
+  border-color: #52ab98;
   color: #0b3038;
 }
 

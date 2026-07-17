@@ -57,8 +57,8 @@ export function LaunchProfileEditor({
                 <div>
                   <Dialog.Title className="text-xl font-semibold tracking-tight text-text">
                     {initialValue
-                      ? "Edit Launch Profile"
-                      : "Create Launch Profile"}
+                      ? "Edit Profile"
+                      : "Create Profile"}
                   </Dialog.Title>
                   <Dialog.Description className="mt-1 text-sm text-muted">
                     Profiles combine commands, editor behavior, and browser URLs

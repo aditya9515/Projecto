@@ -12,9 +12,14 @@ export function SubscriptionBanner({
   subscription,
   onUpgrade,
   onOpenBilling,
-}: SubscriptionBannerProps): JSX.Element {
+}: SubscriptionBannerProps): JSX.Element | null {
   const pro = isProPlan(subscription);
   const reconnect = needsReconnect(subscription);
+
+  if (pro) {
+    return null;
+  }
+
   return (
     <div className="app-neutral-highlight flex flex-col gap-4 rounded-[24px] border border-line px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
       {" "}
@@ -26,12 +31,7 @@ export function SubscriptionBanner({
             plan={subscription.plan}
             status={subscription.status}
           />{" "}
-          {pro ? (
-            <span className="inline-flex items-center gap-1 text-xs text-muted">
-              {" "}
-              <ShieldCheck className="h-3.5 w-3.5" /> Verified Pro access{" "}
-            </span>
-          ) : reconnect ? (
+          {reconnect ? (
             <span className="inline-flex items-center gap-1 text-xs text-muted">
               {" "}
               <ShieldCheck className="h-3.5 w-3.5" /> Sign in to sync desktop
@@ -45,7 +45,7 @@ export function SubscriptionBanner({
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted">
               {" "}
-              <Sparkles className="h-3.5 w-3.5" /> Standard plan limits apply{" "}
+              <Sparkles className="h-3.5 w-3.5" /> Free plan limits apply{" "}
             </span>
           )}{" "}
         </div>{" "}
@@ -53,35 +53,27 @@ export function SubscriptionBanner({
           {" "}
           <div className="text-base font-semibold text-text">
             {" "}
-            {pro
-              ? "Pro access is active on this device."
-              : reconnect
-                ? "Sign in with Projecto to sync this desktop workspace."
-                : "Upgrade on the web to unlock the full Projecto workspace."}{" "}
+            {reconnect
+              ? "Sign in with Projecto to sync this desktop workspace."
+              : "Upgrade on the web to unlock the full Projecto workspace."}{" "}
           </div>{" "}
           <div className="text-sm text-muted">
             {" "}
-            {pro
-              ? subscription.email
-                ? `Signed in as ${subscription.email}. Refresh anytime to keep this device in sync.`
-                : "Refresh anytime from Billing to keep desktop access in sync."
-              : reconnect
-                ? "Projecto uses your online account to verify access and sync project directories."
-                : "Get unlimited projects, unlimited launches, advanced detection, and bulk import."}{" "}
+            {reconnect
+              ? "Projecto uses your online account to verify access and sync project directories."
+              : "Get unlimited projects, unlimited launches, advanced detection, and bulk import."}{" "}
           </div>{" "}
         </div>{" "}
       </div>{" "}
       <div className="flex flex-wrap gap-2">
         {" "}
-        {!pro ? (
-          <Button onClick={onUpgrade} variant="primary">
-            {" "}
-            Upgrade to Pro{" "}
-          </Button>
-        ) : null}{" "}
+        <Button onClick={onUpgrade} variant="primary">
+          {" "}
+          Upgrade{" "}
+        </Button>{" "}
         <Button onClick={onOpenBilling} variant="secondary">
           {" "}
-          Billing Status{" "}
+          Billing{" "}
         </Button>{" "}
       </div>{" "}
     </div>

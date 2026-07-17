@@ -2,14 +2,11 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
-  CircleUserRound,
-  CreditCard,
   FolderPlus,
   Folders,
   Home,
   Loader2,
   Play,
-  Rocket,
   Search,
   Settings,
   Square,
@@ -24,6 +21,7 @@ import type {
   LaunchProfile,
   Project,
 } from "../../../main/types/shared";
+import { AppIcon } from "./AppIcon";
 import { ProjectHealthBadge } from "../project/ProjectHealthBadge";
 import { useCommandSafetySummaries } from "../../hooks/useCommandSafetySummaries";
 import { useAppStatusStore } from "../../store/useAppStatusStore";
@@ -38,6 +36,7 @@ import {
   getRunnableProfileCommands,
 } from "../../utils/launch";
 import { handleMappedLaunchError } from "../../utils/launchErrorHandlers";
+import { getFriendlyErrorMessage } from "../../utils/errors";
 import { getProjectHealthStatus } from "../../utils/projectHealth";
 import {
   formatTerminalStrategyLabel,
@@ -63,7 +62,6 @@ export function CommandPalette(): JSX.Element {
   const setOpen = useUiStore((state) => state.setCommandPaletteOpen);
   const projects = useProjectsStore((state) => state.projects);
   const settings = useSettingsStore((state) => state.settings);
-  const bridgeState = useAppStatusStore((state) => state.bridgeState);
   const recentLaunchFailures = useAppStatusStore(
     (state) => state.recentLaunchFailures,
   );
@@ -113,7 +111,7 @@ export function CommandPalette(): JSX.Element {
         pushToast({
           title: "Unable to launch profile",
           description:
-            error instanceof Error ? error.message : "Unknown launch error.",
+            getFriendlyErrorMessage(error, "Projecto could not launch this profile."),
           tone: "error",
         });
       }
@@ -151,7 +149,7 @@ export function CommandPalette(): JSX.Element {
         pushToast({
           title: "Unable to run command",
           description:
-            error instanceof Error ? error.message : "Unknown command error.",
+            getFriendlyErrorMessage(error, "Projecto could not run this command."),
           tone: "error",
         });
       }
@@ -170,10 +168,7 @@ export function CommandPalette(): JSX.Element {
       } catch (error) {
         pushToast({
           title: "Unable to stop project",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Unknown project stop error.",
+          description: getFriendlyErrorMessage(error, "Projecto could not stop this project launch."),
           tone: "error",
         });
       }
@@ -210,41 +205,23 @@ export function CommandPalette(): JSX.Element {
         id: "nav-health",
         title: "Open Health",
         subtitle:
-          "Check account, sync, bridge, extension, and launch diagnostics",
+          "Check account, sync, terminal, and launch diagnostics",
         icon: <Activity className="h-4 w-4" />,
-        keywords: "health diagnostics status sync bridge extension",
+        keywords: "health diagnostics status sync terminal",
         onSelect: () => navigate("/health"),
-      },
-      {
-        id: "nav-pricing",
-        title: "Open Pricing",
-        subtitle: "See Standard vs Pro plans",
-        icon: <CreditCard className="h-4 w-4" />,
-        keywords: "pricing billing upgrade pro",
-        onSelect: () => navigate("/pricing"),
-      },
-      {
-        id: "nav-account",
-        title: "Open Account",
-        subtitle: "See your desktop sign-in and subscription details",
-        icon: <CircleUserRound className="h-4 w-4" />,
-        keywords: "account user profile subscription billing",
-        onSelect: () => navigate("/account"),
       },
       {
         id: "nav-settings",
         title: "Open Settings",
-        subtitle: "Update editor, terminal, and preferences",
+        subtitle: "Update account, billing, editor, terminal, and preferences",
         icon: <Settings className="h-4 w-4" />,
-        keywords: "settings preferences editor terminal",
+        keywords: "settings preferences account billing pricing terminal",
         onSelect: () => navigate("/settings"),
       },
     ];
     const projectItems = projects.map((project) => {
       const health = getProjectHealthStatus({
         project,
-        settings,
-        bridgeState,
         recentLaunchFailures,
         commandSafety: commandSafetyByProjectId[project.id] ?? [],
       });
@@ -252,7 +229,7 @@ export function CommandPalette(): JSX.Element {
         id: `project-${project.id}`,
         title: project.name,
         subtitle: `Open project details | ${project.path}`,
-        icon: <Rocket className="h-4 w-4" />,
+        icon: <AppIcon className="h-4 w-4" />,
         badge: <ProjectHealthBadge status={health} />,
         keywords: `${project.name} ${project.path} ${project.framework ?? ""} ${project.detectedType} ${health}`,
         onSelect: () => navigate(`/projects/${project.id}`),
@@ -340,14 +317,13 @@ export function CommandPalette(): JSX.Element {
       ...commandItems,
     ];
   }, [
-    bridgeState,
     commandSafetyByProjectId,
     navigate,
     projects,
     recentLaunchFailures,
     runCommand,
     runProfile,
-    settings,
+    settings.askBeforeRunningNewCommands,
     stopProject,
     terminalSessions,
   ]);

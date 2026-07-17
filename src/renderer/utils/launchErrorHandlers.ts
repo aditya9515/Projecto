@@ -14,8 +14,8 @@ export async function handleMappedLaunchError(
 
   if (alreadyRunningProjectId) {
     pushToast({
-      title: "Project already running",
-      description: `Project ${alreadyRunningProjectId} already has an active background process. Use Stop before launching it again.`,
+      title: "Project is running",
+      description: "Use Stop or Mapped Terminal before launching again.",
       tone: "info",
     });
     return true;
@@ -25,8 +25,9 @@ export async function handleMappedLaunchError(
 
   if (portConflict) {
     pushToast({
-      title: `Port ${portConflict.port} is already mapped`,
-      description: `Another Projecto project owns this port right now (${portConflict.projectId}). Stop or reveal that terminal before launching a second project on the same port.`,
+      title: `Port ${portConflict.port} is in use`,
+      description:
+        "Another Projecto launch owns this port. Stop it or choose a different port.",
       tone: "error",
     });
     return true;

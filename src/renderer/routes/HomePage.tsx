@@ -33,6 +33,7 @@ import {
   getRunnableProfileCommands,
 } from "../utils/launch";
 import { handleMappedLaunchError } from "../utils/launchErrorHandlers";
+import { getFriendlyErrorMessage } from "../utils/errors";
 import { formatAbsoluteDate } from "../utils/format";
 import { Button } from "../components/common/Button";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
@@ -41,10 +42,7 @@ import {
   projectHealthCopy,
 } from "../utils/projectHealth";
 import { useCommandSafetySummaries } from "../hooks/useCommandSafetySummaries";
-import {
-  getProjectLaunchButtonState,
-  isVscodeTerminalStrategy,
-} from "../utils/terminalSessions";
+import { getProjectLaunchButtonState } from "../utils/terminalSessions";
 type PendingLaunch = { project: Project; profile: LaunchProfile };
 export function HomePage(): JSX.Element {
   const navigate = useNavigate();
@@ -54,7 +52,6 @@ export function HomePage(): JSX.Element {
   const initialized = useProjectsStore((state) => state.initialized);
   const loading = useProjectsStore((state) => state.loading);
   const settings = useSettingsStore((state) => state.settings);
-  const bridgeState = useAppStatusStore((state) => state.bridgeState);
   const online = useAppStatusStore((state) => state.online);
   const lastSyncedAt = useAppStatusStore((state) => state.lastSyncedAt);
   const latestSyncError = useAppStatusStore((state) => state.latestSyncError);
@@ -119,8 +116,6 @@ export function HomePage(): JSX.Element {
       project.id,
       getProjectHealthStatus({
         project,
-        settings,
-        bridgeState,
         recentLaunchFailures,
         commandSafety: commandSafetyByProjectId[project.id] ?? [],
       }),
@@ -144,19 +139,6 @@ export function HomePage(): JSX.Element {
             id: "sync",
             title: "Sync needs attention",
             description: latestSyncError,
-            action: "Open Health",
-            onClick: () => navigate("/health"),
-          },
-        ]
-      : []),
-    ...(isVscodeTerminalStrategy(settings.terminalStrategy) &&
-    !bridgeState.extensionConnected
-      ? [
-          {
-            id: "bridge",
-            title: "Extension not connected",
-            description:
-              "VS Code terminal launches need the Projecto extension bridge.",
             action: "Open Health",
             onClick: () => navigate("/health"),
           },
@@ -212,8 +194,7 @@ export function HomePage(): JSX.Element {
       }
       pushToast({
         title: "Unable to launch project",
-        description:
-          error instanceof Error ? error.message : "Unknown launch error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not launch this project."),
         tone: "error",
       });
     }
@@ -243,6 +224,27 @@ export function HomePage(): JSX.Element {
     const targetTab = project.commands.length === 0 ? "commands" : "launch";
     navigate(`/projects/${project.id}?tab=${targetTab}`);
   }
+  function handleRevealTerminal(project: Project): void {
+    void window.launchStack.launcher
+      .revealProjectTerminal(project.id)
+      .then(() => {
+        pushToast({
+          title: "Mapped terminal opened",
+          description: `Opened the terminal mapped to ${project.name}.`,
+          tone: "success",
+        });
+      })
+      .catch((error) => {
+        pushToast({
+          title: "Unable to open mapped terminal",
+          description: getFriendlyErrorMessage(
+            error,
+            "Projecto could not open the mapped terminal for this project.",
+          ),
+          tone: "error",
+        });
+      });
+  }
   function handleStopProject(project: Project): void {
     void window.launchStack.launcher
       .stopProjectTerminal(project.id)
@@ -258,8 +260,8 @@ export function HomePage(): JSX.Element {
           title: "Unable to stop project",
           description:
             error instanceof Error
-              ? error.message
-              : "Unknown project stop error.",
+              ? getFriendlyErrorMessage(error)
+              : "Projecto could not stop this project launch.",
           tone: "error",
         });
       });
@@ -294,11 +296,11 @@ export function HomePage(): JSX.Element {
           </Button>{" "}
           <Button
             leadingIcon={<Zap className="h-4 w-4" />}
-            onClick={() => navigate("/pricing")}
+            onClick={() => navigate("/settings")}
             variant="secondary"
           >
             {" "}
-            View Pro{" "}
+            Account{" "}
           </Button>{" "}
           <Button
             leadingIcon={<FolderPlus className="h-4 w-4" />}
@@ -318,9 +320,9 @@ export function HomePage(): JSX.Element {
           tone={online ? "success" : "danger"}
         />{" "}
         <StatusStripItem
-          label="Extension"
-          value={bridgeState.extensionConnected ? "Connected" : "Waiting"}
-          tone={bridgeState.extensionConnected ? "success" : "warning"}
+          label="Terminal"
+          value="Windows Terminal"
+          tone="neutral"
         />{" "}
         <StatusStripItem
           label="Active runs"
@@ -398,27 +400,25 @@ export function HomePage(): JSX.Element {
               <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
                 Subscription
               </div>{" "}
-              <div className="mt-3 flex items-center gap-2">
-                {" "}
-                <PlanBadge
-                  plan={subscription.plan}
-                  status={subscription.status}
-                />{" "}
-              </div>{" "}
+              {subscription.plan === "pro" ? (
+                <div className="mt-3 flex items-center gap-2">
+                  <PlanBadge
+                    plan={subscription.plan}
+                    status={subscription.status}
+                  />
+                </div>
+              ) : null}{" "}
             </div>{" "}
             <Button
               onClick={() => {
                 if (subscription.email) {
-                  navigate("/account");
+                  navigate("/settings");
                   return;
                 }
                 void startGoogleSignIn().catch((error) => {
                   pushToast({
                     title: "Unable to open Projecto sign-in",
-                    description:
-                      error instanceof Error
-                        ? error.message
-                        : "Unknown sign-in error.",
+                    description: getFriendlyErrorMessage(error, "Projecto could not start sign-in."),
                     tone: "error",
                   });
                 });
@@ -451,9 +451,7 @@ export function HomePage(): JSX.Element {
             subscription.archivedProjectCount > 0 ? (
               <div className="text-xs text-muted">
                 {" "}
-                {subscription.archivedProjectCount} project
-                {subscription.archivedProjectCount === 1 ? "" : "s"} hidden on
-                Standard. Upgrade to restore them automatically.{" "}
+                {subscription.archivedProjectCount} project{subscription.archivedProjectCount === 1 ? "" : "s"} locked. Upgrade to Plus to restore them automatically.{" "}
               </div>
             ) : null}{" "}
             <div className="text-xs text-muted">
@@ -516,10 +514,7 @@ export function HomePage(): JSX.Element {
                 void startGoogleSignIn().catch((error) => {
                   pushToast({
                     title: "Unable to open Projecto sign-in",
-                    description:
-                      error instanceof Error
-                        ? error.message
-                        : "Unknown sign-in error.",
+                    description: getFriendlyErrorMessage(error, "Projecto could not start sign-in."),
                     tone: "error",
                   });
                 });
@@ -562,6 +557,7 @@ export function HomePage(): JSX.Element {
                         )}
                         onLaunch={handleProjectLaunch}
                         onStopProject={handleStopProject}
+                        onRevealTerminal={handleRevealTerminal}
                         onOpenEditor={(entry) =>
                           void window.launchStack.launcher.openEditor(entry.id)
                         }
@@ -620,6 +616,7 @@ export function HomePage(): JSX.Element {
                         )}
                         onLaunch={handleProjectLaunch}
                         onStopProject={handleStopProject}
+                        onRevealTerminal={handleRevealTerminal}
                         onOpenEditor={(entry) =>
                           void window.launchStack.launcher.openEditor(entry.id)
                         }

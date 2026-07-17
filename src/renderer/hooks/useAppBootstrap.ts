@@ -10,8 +10,9 @@ import { useSubscriptionStore } from "../store/useSubscriptionStore";
 import { useToastStore } from "../store/useToastStore";
 import { useUiStore } from "../store/useUiStore";
 import { useUpdateStore } from "../store/useUpdateStore";
+import { getFriendlyErrorMessage } from "../utils/errors";
 
-let standardLaunchPromptShown = false;
+let freeLaunchPromptShown = false;
 
 export function useAppBootstrap(): void {
   const navigate = useNavigate();
@@ -102,10 +103,7 @@ export function useAppBootstrap(): void {
       void loadSubscription()
         .then(() => markSynced())
         .catch((error) => {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unknown desktop sign-in error.";
+          const message = getFriendlyErrorMessage(error, "Projecto could not restore your desktop session.");
           setSyncError(message);
           pushToast({
             title: "Unable to restore desktop session",
@@ -126,10 +124,7 @@ export function useAppBootstrap(): void {
       void loadProjects()
         .then(() => markSynced())
         .catch((error) => {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unknown project sync error.";
+          const message = getFriendlyErrorMessage(error, "Projecto could not load synced projects.");
           setSyncError(message);
           pushToast({
             title: "Unable to load synced projects",
@@ -173,7 +168,7 @@ export function useAppBootstrap(): void {
   ]);
   useEffect(() => {
     if (
-      standardLaunchPromptShown ||
+      freeLaunchPromptShown ||
       !online ||
       !settingsInitialized ||
       !subscriptionInitialized ||
@@ -183,8 +178,8 @@ export function useAppBootstrap(): void {
     ) {
       return;
     }
-    standardLaunchPromptShown = true;
-    openUpgradeModal("standardLaunch");
+    freeLaunchPromptShown = true;
+    openUpgradeModal("freeLaunch");
   }, [
     online,
     openUpgradeModal,
@@ -303,7 +298,7 @@ export function useAppBootstrap(): void {
       if (modifier && event.shiftKey && event.key.toLowerCase() === "u") {
         event.preventDefault();
         openUpgradeModal("projects");
-        navigate("/pricing");
+        navigate("/settings");
       }
     }
     window.addEventListener("keydown", handleKeydown);

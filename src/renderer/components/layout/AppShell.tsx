@@ -24,23 +24,16 @@ const pageTitles: Record<string, { title: string; description: string }> = {
     title: "Projects",
     description: "Browse every project connected to this desktop workspace.",
   },
-  "/account": {
-    title: "Account",
-    description:
-      "Your Projecto account, plan status, and desktop access on this device.",
-  },
+
   "/health": {
     title: "Health",
     description:
-      "Check desktop, sync, extension, account, and launch diagnostics.",
+      "Check desktop, sync, account, terminal, and launch diagnostics.",
   },
   "/settings": {
     title: "Settings",
-    description: "Editors, launches, terminals, and desktop preferences.",
-  },
-  "/pricing": {
-    title: "Pricing",
-    description: "Compare plans, manage access, and keep this device in sync.",
+    description:
+      "Account, plan, editors, launches, terminals, and desktop preferences.",
   },
 };
 export function AppShell({ children }: { children: ReactNode }): JSX.Element {
@@ -110,11 +103,11 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
               {" "}
               <SubscriptionBanner
                 onOpenBilling={() => {
-                  navigate("/pricing");
+                  navigate("/settings");
                 }}
                 onUpgrade={() => {
                   openUpgradeModal("projects");
-                  navigate("/pricing");
+                  navigate("/settings");
                 }}
                 subscription={subscription}
               />{" "}

@@ -24,9 +24,7 @@ import type {
   CommandSafetySummary,
   LaunchCommand,
   LaunchProfile,
-  Project,
-  TerminalStrategy,
-} from "../../main/types/shared";
+  Project,} from "../../main/types/shared";
 import { Button } from "../components/common/Button";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { EmptyState } from "../components/common/EmptyState";
@@ -55,6 +53,7 @@ import {
   getRunnableProfileCommands,
 } from "../utils/launch";
 import { handleMappedLaunchError } from "../utils/launchErrorHandlers";
+import { getFriendlyErrorMessage } from "../utils/errors";
 import { buildWorkspacePresets } from "../utils/presets";
 import {
   getProjectHealthStatus,
@@ -63,7 +62,6 @@ import {
 import {
   formatTerminalStrategyLabel,
   getProjectLaunchButtonState,
-  isVscodeTerminalStrategy,
   type ProjectLaunchButtonState,
 } from "../utils/terminalSessions";
 type PendingConfirmation =
@@ -124,7 +122,6 @@ export function ProjectDetailPage(): JSX.Element {
     (state) => state.openUpgradeModal,
   );
   const pushToast = useToastStore((state) => state.pushToast);
-  const bridgeState = useAppStatusStore((state) => state.bridgeState);
   const recentLaunchFailures = useAppStatusStore(
     (state) => state.recentLaunchFailures,
   );
@@ -180,7 +177,7 @@ export function ProjectDetailPage(): JSX.Element {
       <EmptyState
         actionLabel="Open Billing"
         description="Connect this desktop app to your Projecto account first, then Projecto can load your synced project details."
-        onAction={() => navigate("/pricing")}
+        onAction={() => navigate("/settings")}
         title="Desktop sign-in required"
       />
     );
@@ -245,8 +242,6 @@ export function ProjectDetailPage(): JSX.Element {
     : currentProject.suggestedBrowserUrls;
   const healthStatus = getProjectHealthStatus({
     project: currentProject,
-    settings,
-    bridgeState,
     recentLaunchFailures,
     commandSafety,
   });
@@ -294,10 +289,7 @@ export function ProjectDetailPage(): JSX.Element {
       }
       pushToast({
         title: "Unable to save project",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Unknown project update error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not save this project."),
         tone: "error",
       });
       return false;
@@ -343,7 +335,7 @@ export function ProjectDetailPage(): JSX.Element {
       pushToast({
         title: "Unable to launch profile",
         description:
-          error instanceof Error ? error.message : "Unknown launch error.",
+          getFriendlyErrorMessage(error, "Projecto could not launch this profile."),
         tone: "error",
       });
     }
@@ -382,7 +374,7 @@ export function ProjectDetailPage(): JSX.Element {
       pushToast({
         title: "Unable to run command",
         description:
-          error instanceof Error ? error.message : "Unknown command error.",
+          getFriendlyErrorMessage(error, "Projecto could not run this command."),
         tone: "error",
       });
     }
@@ -400,10 +392,7 @@ export function ProjectDetailPage(): JSX.Element {
       .catch((error) => {
         pushToast({
           title: "Unable to stop project",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Unknown project stop error.",
+          description: getFriendlyErrorMessage(error, "Projecto could not stop this project launch."),
           tone: "error",
         });
       });
@@ -451,23 +440,21 @@ export function ProjectDetailPage(): JSX.Element {
         }}
       />{" "}
       {projectLocked ? (
-        <InlineWarning title="Locked on Standard">
+        <InlineWarning title="Locked by plan">
           {" "}
           <div className="space-y-3">
             <p>
-              Standard keeps the 5 most-used projects runnable. This project is
-              still visible, can be opened, and can be removed, but launching or
-              editing it requires Pro.
+              This project is visible and removable, but launching or editing it requires Plus.
               {currentProject.subscriptionRank &&
               currentProject.subscriptionLimit
-                ? ` It is ranked #${currentProject.subscriptionRank}; Standard unlocks the first ${currentProject.subscriptionLimit}.`
+                ? ` It is ranked #${currentProject.subscriptionRank}; Free unlocks the first ${currentProject.subscriptionLimit}.`
                 : ""}
             </p>
             <Button
               onClick={() => openUpgradeModal("lockedProject")}
               variant="secondary"
             >
-              <Lock className="h-4 w-4" /> Upgrade to Pro
+              <Lock className="h-4 w-4" /> Upgrade
             </Button>
           </div>{" "}
         </InlineWarning>
@@ -489,11 +476,7 @@ export function ProjectDetailPage(): JSX.Element {
         </Tabs.List>{" "}
         <Tabs.Content className="mt-6 space-y-6" value="launch">
           {" "}
-          <LaunchWarnings
-            bridgeConnected={bridgeState.extensionConnected}
-            healthStatus={healthStatus}
-            terminalStrategy={settings.terminalStrategy}
-          />{" "}
+          <LaunchWarnings healthStatus={healthStatus} />{" "}
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
             {" "}
             <PremiumCard className="p-5">
@@ -558,7 +541,7 @@ export function ProjectDetailPage(): JSX.Element {
               <div className="mt-5 grid gap-3 md:grid-cols-3">
                 {" "}
                 <QuickAction
-                  label="Open Editor"
+                  label="Editor"
                   onClick={() =>
                     void window.launchStack.launcher.openEditor(
                       currentProject.id,
@@ -567,7 +550,7 @@ export function ProjectDetailPage(): JSX.Element {
                   value="VS Code"
                 />{" "}
                 <QuickAction
-                  label="Open Folder"
+                  label="Folder"
                   onClick={() =>
                     void window.launchStack.launcher.openFolder(
                       currentProject.path,
@@ -618,13 +601,7 @@ export function ProjectDetailPage(): JSX.Element {
                           .join(", ")
                       : "None yet"
                   }
-                />{" "}
-                <RuntimeItem
-                  label="Extension"
-                  value={
-                    bridgeState.extensionConnected ? "Connected" : "Waiting"
-                  }
-                />{" "}
+                />{" "}{" "}
               </div>{" "}
             </PremiumCard>{" "}
           </div>{" "}
@@ -780,7 +757,7 @@ export function ProjectDetailPage(): JSX.Element {
                   variant="secondary"
                 >
                   {" "}
-                  Unlock in Pro{" "}
+                  Unlock with Plus{" "}
                 </Button>
               ) : null}{" "}
             </div>{" "}
@@ -1424,7 +1401,7 @@ function ProjectHeader({
             variant="secondary"
           >
             {" "}
-            <FolderOpen className="h-4 w-4" /> Open Folder{" "}
+            <FolderOpen className="h-4 w-4" /> Folder{" "}
           </Button>{" "}
           <Button
             onClick={() =>
@@ -1433,7 +1410,7 @@ function ProjectHeader({
             variant="secondary"
           >
             {" "}
-            <SquareArrowOutUpRight className="h-4 w-4" /> Open Editor{" "}
+            <SquareArrowOutUpRight className="h-4 w-4" /> Editor{" "}
           </Button>{" "}
           <Button disabled={locked} onClick={onFavorite} variant="ghost">
             {" "}
@@ -1449,36 +1426,22 @@ function ProjectHeader({
 }
 function LaunchWarnings({
   healthStatus,
-  terminalStrategy,
-  bridgeConnected,
 }: {
   healthStatus: Parameters<typeof ProjectHealthBadge>[0]["status"];
-  terminalStrategy: TerminalStrategy;
-  bridgeConnected: boolean;
 }): JSX.Element | null {
-  const warnings = [
-    healthStatus !== "ready" && healthStatus !== "locked"
-      ? projectHealthCopy[healthStatus].description
-      : null,
-    isVscodeTerminalStrategy(terminalStrategy) && !bridgeConnected
-      ? "VS Code Terminal requires the Projecto editor extension. Connect it or switch to OS Terminal."
-      : null,
-  ].filter((entry): entry is string => Boolean(entry));
-  if (warnings.length === 0) {
+  if (healthStatus === "ready" || healthStatus === "locked") {
     return null;
   }
+
+  const warning = projectHealthCopy[healthStatus].description;
+
   return (
     <div className="space-y-3">
-      {" "}
-      {warnings.map((warning) => (
-        <InlineWarning key={warning} title="Launch attention">
-          {" "}
-          {warning}{" "}
-        </InlineWarning>
-      ))}{" "}
+      <InlineWarning title="Launch attention">{warning}</InlineWarning>
     </div>
   );
 }
+
 function QuickAction({
   label,
   value,

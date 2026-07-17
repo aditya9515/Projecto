@@ -124,7 +124,7 @@ function shutdownServices(): Promise<void> {
     await runShutdownStep("launcher", () => {
       launcherService?.stopAllRuns();
     });
-    await runShutdownStep("desktop bridge", async () => {
+    await runShutdownStep("terminal compatibility", async () => {
       await desktopBridgeService?.stop();
     });
     await runShutdownStep("subscription", async () => {
@@ -322,7 +322,6 @@ async function bootstrapIpc(
     externalUrlService,
     subscriptionService,
     commandSafetyService,
-    desktopBridgeService,
     terminalSessionStore,
   );
   desktopBridgeService.setLauncherService(launcherService);

@@ -9,6 +9,16 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function findPrefixedPayload(message: string, prefix: string): string | null {
+  const prefixIndex = message.indexOf(prefix);
+
+  if (prefixIndex === -1) {
+    return null;
+  }
+
+  return message.slice(prefixIndex + prefix.length).trim();
+}
+
 export function createProjectAlreadyRunningError(projectId: string): Error {
   return new Error(`${PROJECT_ALREADY_RUNNING_PREFIX}${projectId}`);
 }
@@ -22,12 +32,12 @@ export function createProjectPortOwnedError(
 
 export function parseProjectAlreadyRunning(error: unknown): string | null {
   const message = getErrorMessage(error);
+  const projectId = findPrefixedPayload(message, PROJECT_ALREADY_RUNNING_PREFIX);
 
-  if (!message.startsWith(PROJECT_ALREADY_RUNNING_PREFIX)) {
+  if (!projectId) {
     return null;
   }
 
-  const projectId = message.slice(PROJECT_ALREADY_RUNNING_PREFIX.length).trim();
   return projectId.length > 0 ? projectId : null;
 }
 
@@ -35,14 +45,13 @@ export function parseProjectPortOwned(
   error: unknown,
 ): { port: number; projectId: string } | null {
   const message = getErrorMessage(error);
+  const payload = findPrefixedPayload(message, PROJECT_PORT_OWNED_PREFIX);
 
-  if (!message.startsWith(PROJECT_PORT_OWNED_PREFIX)) {
+  if (!payload) {
     return null;
   }
 
-  const [portValue, projectId] = message
-    .slice(PROJECT_PORT_OWNED_PREFIX.length)
-    .split(":");
+  const [portValue, projectId] = payload.split(":");
   const port = Number(portValue);
 
   if (!Number.isInteger(port) || port < 1 || port > 65_535 || !projectId) {

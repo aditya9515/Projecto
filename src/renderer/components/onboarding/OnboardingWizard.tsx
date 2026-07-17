@@ -6,11 +6,11 @@ import {
   Command,
   Crown,
   FolderPlus,
-  Rocket,
   SquareArrowOutUpRight,
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { AppIcon } from "../common/AppIcon";
 import { Button } from "../common/Button";
 import { PricingToggle } from "../common/PricingToggle";
 type OnboardingWizardProps = {
@@ -27,13 +27,13 @@ const steps = [
     title: "Welcome to Projecto",
     description:
       "Turn plain folders into launch-ready developer workspaces with detection, profiles, mirrored logs, and polished desktop control.",
-    icon: <Rocket className="h-5 w-5" />,
+    icon: <AppIcon className="h-5 w-5" />,
   },
   {
     id: "editor",
     title: "Use VS Code",
     description:
-      "Projecto opens projects in VS Code. VS Code Terminal uses the Projecto VS Code extension.",
+      "Projecto opens folders in VS Code and runs project commands in Windows Terminal.",
     icon: <SquareArrowOutUpRight className="h-5 w-5" />,
   },
   {
@@ -52,9 +52,9 @@ const steps = [
   },
   {
     id: "upsell",
-    title: "Upgrade when you outgrow Standard",
+    title: "Upgrade when needed",
     description:
-      "Pro unlocks unlimited projects, unlimited profiles, workspace presets, and bulk import.",
+      "Plus unlocks unlimited projects, unlimited profiles, workspace presets, and bulk import.",
     icon: <Crown className="h-5 w-5" />,
   },
 ] as const;
@@ -170,9 +170,7 @@ export function OnboardingWizard({
                                   VS Code
                                 </div>
                                 <div className="mt-2 text-sm leading-6 text-muted">
-                                  Projecto uses the `code` command to open
-                                  folders and the Projecto VS Code extension for
-                                  VS Code terminal launches.
+                                  Projecto uses the `code` command to open folders. Project commands run in Windows Terminal.
                                 </div>
                                 <div className="mt-4 rounded-2xl border border-line bg-shell px-4 py-3 text-sm text-muted">
                                   Current editor: VS Code
@@ -238,7 +236,7 @@ export function OnboardingWizard({
                             <div className="space-y-6">
                               <div className="app-neutral-highlight rounded-[28px] border border-line p-5">
                                 <div className="text-lg font-semibold text-text">
-                                  Projecto Pro
+                                  Projecto Plus
                                 </div>
                                 <div className="mt-2 text-sm text-muted">
                                   Unlimited projects, unlimited profiles,
@@ -266,7 +264,7 @@ export function OnboardingWizard({
                                   onClick={onOpenUpgrade}
                                   variant="primary"
                                 >
-                                  <Crown className="h-4 w-4" /> View Pro pricing
+                                  <Crown className="h-4 w-4" /> Pricing
                                 </Button>
                                 <Button
                                   onClick={() => void onComplete()}

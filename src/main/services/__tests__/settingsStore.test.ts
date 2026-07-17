@@ -21,10 +21,10 @@ describe("SettingsStore", () => {
 
     const settings = await store.getSettings();
 
-    expect(settings.terminalStrategy).toBe("os-internal");
+    expect(settings.terminalStrategy).toBe("os-external");
     expect(fileSystemService.writeJsonAtomic).toHaveBeenCalledWith(
       expect.stringContaining("settings.json"),
-      expect.objectContaining({ terminalStrategy: "os-internal" }),
+      expect.objectContaining({ terminalStrategy: "os-external" }),
     );
   });
 
@@ -45,17 +45,17 @@ describe("SettingsStore", () => {
 
     const settings = await store.getSettings();
 
-    expect(settings.terminalStrategy).toBe("os-internal");
+    expect(settings.terminalStrategy).toBe("os-external");
     expect(fileSystemService.writeJsonAtomic).toHaveBeenCalledWith(
       expect.stringContaining("settings.json"),
-      expect.objectContaining({ terminalStrategy: "os-internal" }),
+      expect.objectContaining({ terminalStrategy: "os-external" }),
     );
   });
 
   it("migrates old two-mode terminal settings to combined terminal modes", async () => {
     for (const [legacy, migrated] of [
-      ["external", "os-internal"],
-      ["editor", "vscode-internal"],
+      ["external", "os-external"],
+      ["editor", "os-external"],
     ] as const) {
       const fileSystemService = {
         readJsonFile: vi.fn().mockResolvedValue({

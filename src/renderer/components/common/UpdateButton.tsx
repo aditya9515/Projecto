@@ -32,6 +32,7 @@ export function UpdateButton({
     updateState.status === "checking" ||
     updateState.status === "downloading" ||
     updateState.status === "installing";
+
   const Icon = isBusy
     ? LoaderCircle
     : updateState.updateAvailable

@@ -1,14 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CircleUserRound,
-  CreditCard,
   Activity,
   FolderPlus,
   Folders,
   Home,
   PanelLeftClose,
   PanelLeftOpen,
-  Rocket,
   Search,
   Settings,
 } from "lucide-react";
@@ -16,14 +13,13 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useSubscriptionStore } from "../../store/useSubscriptionStore";
 import { useUiStore } from "../../store/useUiStore";
 import { AccountIdentity } from "../common/AccountIdentity";
+import { AppIcon } from "../common/AppIcon";
 import { UpdateButton } from "../common/UpdateButton";
 const navigationItems = [
   { label: "Home", to: "/", icon: Home },
   { label: "Import", to: "/import", icon: FolderPlus },
   { label: "Projects", to: "/projects", icon: Folders },
-  { label: "Account", to: "/account", icon: CircleUserRound },
   { label: "Health", to: "/health", icon: Activity },
-  { label: "Pricing", to: "/pricing", icon: CreditCard },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 function BrandBlock({ collapsed }: { collapsed: boolean }): JSX.Element {
@@ -37,7 +33,7 @@ function BrandBlock({ collapsed }: { collapsed: boolean }): JSX.Element {
         whileHover={{ scale: 1.04 }}
       >
         {" "}
-        <Rocket className="h-5 w-5" />{" "}
+        <AppIcon className="h-8 w-8 rounded-lg" />{" "}
       </motion.div>{" "}
       <AnimatePresence initial={false}>
         {" "}
@@ -52,9 +48,6 @@ function BrandBlock({ collapsed }: { collapsed: boolean }): JSX.Element {
             {" "}
             <div className="truncate text-[15px] font-semibold tracking-tight text-text">
               Projecto
-            </div>{" "}
-            <div className="text-xs uppercase tracking-[0.16em] text-muted">
-              Workspace Control
             </div>{" "}
           </motion.div>
         ) : null}{" "}
@@ -194,35 +187,6 @@ export function AnimatedSidebar(): JSX.Element {
             ) : null}{" "}
           </AnimatePresence>{" "}
         </motion.button>{" "}
-        <div className="rounded-2xl border border-line bg-bg px-4 py-3">
-          {" "}
-          <AnimatePresence initial={false}>
-            {" "}
-            {!collapsed ? (
-              <motion.div
-                animate={{ y: 0 }}
-                exit={{ y: 8 }}
-                initial={{ y: 8 }}
-                transition={{ duration: 0.16 }}
-              >
-                {" "}
-                <div className="text-sm font-medium text-text">
-                  Your workspace stays local
-                </div>{" "}
-                <div className="mt-1 text-xs leading-5 text-muted">
-                  {" "}
-                  Source code stays on this device. Project directories sync
-                  through your Projecto account, and launches still run
-                  locally.{" "}
-                </div>{" "}
-              </motion.div>
-            ) : (
-              <div className="flex justify-center text-[11px] uppercase tracking-[0.14em] text-muted">
-                Local
-              </div>
-            )}{" "}
-          </AnimatePresence>{" "}
-        </div>{" "}
       </div>{" "}
     </motion.aside>
   );

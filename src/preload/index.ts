@@ -19,6 +19,7 @@ import type {
   Project,
   ProjectTerminalSession,
   ProjectUpdateInput,
+  RunningPort,
   RunEvent,
   SubscriptionState,
   UsageStats,
@@ -84,6 +85,7 @@ type LaunchStackApi = {
   };
   diagnostics: {
     getReport: () => Promise<DiagnosticsReport>;
+    getRunningPorts: () => Promise<RunningPort[]>;
     exportReport: () => Promise<void>;
     copyReport: () => Promise<void>;
     openAppDataFolder: () => Promise<void>;
@@ -218,6 +220,8 @@ const api: LaunchStackApi = {
   },
   diagnostics: {
     getReport: () => ipcRenderer.invoke("diagnostics:getReport"),
+    getRunningPorts: () =>
+      ipcRenderer.invoke("diagnostics:getRunningPorts"),
     exportReport: () => ipcRenderer.invoke("diagnostics:exportReport"),
     copyReport: () => ipcRenderer.invoke("diagnostics:copyReport"),
     openAppDataFolder: () =>

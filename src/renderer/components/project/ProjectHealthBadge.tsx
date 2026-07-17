@@ -14,7 +14,6 @@ function toneForStatus(
     status === "locked" ||
     status === "no-launch-profile" ||
     status === "approval-required" ||
-    status === "extension-required" ||
     status === "sync-conflict"
   ) {
     return "warning";

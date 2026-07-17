@@ -28,7 +28,7 @@ describe("TerminalSessionStore", () => {
       launchId: "launch-1",
       activeRunId: "run-1",
       runIds: ["run-1"],
-      terminalStrategy: "os-internal",
+      terminalStrategy: "os-external",
       status: "running",
       detectedUrls: [],
       detectedPorts: [],
@@ -42,7 +42,7 @@ describe("TerminalSessionStore", () => {
       expect.objectContaining({
         projectId: "project-1",
         activeRunId: "run-1",
-        terminalStrategy: "os-internal",
+        terminalStrategy: "os-external",
         status: "running",
       }),
     ]);

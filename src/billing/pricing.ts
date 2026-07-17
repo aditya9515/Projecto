@@ -23,33 +23,32 @@ export const FREE_LIMITS = {
 export const PLAN_COPY: Record<SubscriptionPlan, PricingTier> = {
   free: {
     id: "free",
-    name: "Standard",
+    name: "Free",
     tagline: "For focused local work",
     description:
-      "A focused online tier for working with up to five synced project directories.",
+      "Core project launch tools for up to five synced project directories.",
     ctaLabel: "Current plan",
     features: [
       "Up to 5 project directories",
       "Basic project detection",
       "1 active project launch at a time",
       "Bulk import locked",
-      "Solid Projecto workspace palette",
     ],
   },
   pro: {
     id: "pro",
-    name: "Pro",
+    name: "Plus",
     tagline: "For serious builders",
     description:
-      "Unlimited synced workspace control with advanced detection, bulk import, and every new Pro update.",
-    ctaLabel: "Open Web Pricing",
+      "Unlimited synced workspace control with advanced detection, bulk import, and every new Plus update.",
+    ctaLabel: "Pricing",
     highlight: "Most popular",
     features: [
       "Unlimited project directories",
       "Unlimited active project launches",
       "Advanced project detection",
       "Smart bulk import and bulk scan",
-      "All new Pro updates",
+      "All new Plus updates",
     ],
   },
 };
@@ -60,7 +59,7 @@ export const PRICING_MATRIX: PricingFeatureRow[] = [
   { label: "Change directories", free: "Included", pro: "Included" },
   { label: "Bulk import", free: "Locked", pro: "Included" },
   { label: "Bulk scan", free: "Locked", pro: "Included" },
-  { label: "New Pro updates", free: "Basic only", pro: "Included" },
+  { label: "New Plus updates", free: "Basic only", pro: "Included" },
 ];
 
 export const BILLING_DISPLAY: Record<

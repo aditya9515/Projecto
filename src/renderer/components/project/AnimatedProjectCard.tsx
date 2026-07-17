@@ -9,6 +9,7 @@ import {
   Square,
   SquareArrowOutUpRight,
   Star,
+  TerminalSquare,
   TriangleAlert,
   Trash2,
 } from "lucide-react";
@@ -28,6 +29,7 @@ type AnimatedProjectCardProps = {
   onStopProject: (project: Project) => void;
   onOpenFolder: (project: Project) => void;
   onOpenEditor: (project: Project) => void;
+  onRevealTerminal?: (project: Project) => void;
   onToggleFavorite: (project: Project) => void;
   onConfigureLaunch?: (project: Project) => void;
   onRemoveProject?: (project: Project) => void;
@@ -41,6 +43,7 @@ export function AnimatedProjectCard({
   onStopProject,
   onOpenFolder,
   onOpenEditor,
+  onRevealTerminal,
   onToggleFavorite,
   onConfigureLaunch,
   onRemoveProject,
@@ -208,11 +211,16 @@ export function AnimatedProjectCard({
           </Button>{" "}
           <Button onClick={() => onOpenFolder(project)} variant="secondary">
             {" "}
-            <FolderOpen className="h-4 w-4" /> Open Folder{" "}
+            <FolderOpen className="h-4 w-4" /> Folder{" "}
           </Button>{" "}
+          {isTerminalMapped && onRevealTerminal ? (
+            <Button onClick={() => onRevealTerminal(project)} variant="secondary">
+              <TerminalSquare className="h-4 w-4" /> Mapped Terminal
+            </Button>
+          ) : null}{" "}
           <Button onClick={() => onOpenEditor(project)} variant="secondary">
             {" "}
-            <SquareArrowOutUpRight className="h-4 w-4" /> Open Editor{" "}
+            <SquareArrowOutUpRight className="h-4 w-4" /> Editor{" "}
           </Button>{" "}
           {onConfigureLaunch ? (
             <Button
@@ -226,8 +234,8 @@ export function AnimatedProjectCard({
                 <Pencil className="h-4 w-4" />
               )}{" "}
               {project.launchProfiles.length === 0
-                ? "Setup Launch"
-                : "Edit Launch"}{" "}
+                ? "Setup"
+                : "Edit"}{" "}
             </Button>
           ) : null}{" "}
           {onRemoveProject ? (

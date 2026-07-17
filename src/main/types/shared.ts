@@ -9,12 +9,7 @@ export const detectedTypeValues = [
   "unknown",
 ] as const;
 export const editorValues = ["vscode"] as const;
-export const terminalStrategyValues = [
-  "os-internal",
-  "os-external",
-  "vscode-internal",
-  "vscode-external",
-] as const;
+export const terminalStrategyValues = ["os-external"] as const;
 export const runStatusValues = [
   "started",
   "running",
@@ -59,7 +54,7 @@ export const billingCycleValues = ["monthly", "yearly"] as const;
 export const detectionLevelValues = ["basic", "advanced"] as const;
 export const projectStorageValues = ["firestore"] as const;
 export const projectSubscriptionLockReasonValues = [
-  "standard_project_limit",
+  "free_project_limit",
 ] as const;
 export const billingEventTypeValues = [
   "upgrade-opened",
@@ -363,6 +358,15 @@ export const CommandSafetySummarySchema = z.object({
   approved: z.boolean(),
 });
 
+
+export const RunningPortSchema = z.object({
+  protocol: z.string().min(1),
+  localAddress: z.string().min(1),
+  port: z.number().int().min(1).max(65_535),
+  state: z.string().min(1),
+  pid: z.number().int().nonnegative().optional(),
+  processName: z.string().min(1).optional(),
+});
 export const DiagnosticCheckResultSchema = z.object({
   ok: z.boolean(),
   label: z.string().min(1),
@@ -442,6 +446,7 @@ export type ActivityItem = z.infer<typeof ActivityItemSchema>;
 export type UsageStats = z.infer<typeof UsageStatsSchema>;
 export type DesktopBridgeState = z.infer<typeof DesktopBridgeStateSchema>;
 export type CommandSafetySummary = z.infer<typeof CommandSafetySummarySchema>;
+export type RunningPort = z.infer<typeof RunningPortSchema>;
 export type DiagnosticCheckResult = z.infer<typeof DiagnosticCheckResultSchema>;
 export type DiagnosticsReport = z.infer<typeof DiagnosticsReportSchema>;
 export type ExportRunLogsInput = z.infer<typeof ExportRunLogsInputSchema>;
@@ -452,7 +457,7 @@ export type DesktopUpdateCheckOptions = z.infer<
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultEditor: "vscode",
-  terminalStrategy: "os-internal",
+  terminalStrategy: "os-external",
   telemetryEnabled: false,
   askBeforeRunningNewCommands: true,
   launchOnStartup: true,

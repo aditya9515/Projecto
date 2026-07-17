@@ -106,17 +106,8 @@ export class SettingsStore {
       changed = true;
     }
 
-    if (
-      candidate.terminalStrategy === "system" ||
-      candidate.terminalStrategy === "logs" ||
-      candidate.terminalStrategy === "external"
-    ) {
-      candidate.terminalStrategy = "os-internal";
-      changed = true;
-    }
-
-    if (candidate.terminalStrategy === "editor") {
-      candidate.terminalStrategy = "vscode-internal";
+    if (candidate.terminalStrategy !== "os-external") {
+      candidate.terminalStrategy = "os-external";
       changed = true;
     }
 

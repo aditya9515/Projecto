@@ -14,15 +14,14 @@ import { PageHeader } from "../components/common/PageHeader";
 import { PremiumCard } from "../components/common/PremiumCard";
 import { StatusPill } from "../components/common/StatusPill";
 import { HealthStatusCard } from "../components/health/HealthStatusCard";
+import { RunningPortsPanel } from "../components/health/RunningPortsPanel";
 import { useAppStatusStore } from "../store/useAppStatusStore";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { useSubscriptionStore } from "../store/useSubscriptionStore";
 import { useToastStore } from "../store/useToastStore";
 import { formatAbsoluteDate } from "../utils/format";
-import {
-  formatTerminalStrategyLabel,
-  isVscodeTerminalStrategy,
-} from "../utils/terminalSessions";
+import { getFriendlyErrorMessage } from "../utils/errors";
+import { formatTerminalStrategyLabel } from "../utils/terminalSessions";
 function healthTone(ok: boolean): "success" | "danger" {
   return ok ? "success" : "danger";
 }
@@ -30,7 +29,6 @@ export function HealthPage(): JSX.Element {
   const navigate = useNavigate();
   const pushToast = useToastStore((state) => state.pushToast);
   const online = useAppStatusStore((state) => state.online);
-  const bridgeState = useAppStatusStore((state) => state.bridgeState);
   const lastSyncedAt = useAppStatusStore((state) => state.lastSyncedAt);
   const latestSyncError = useAppStatusStore((state) => state.latestSyncError);
   const latestBillingError = useAppStatusStore(
@@ -56,8 +54,7 @@ export function HealthPage(): JSX.Element {
     } catch (error) {
       pushToast({
         title: "Unable to load diagnostics",
-        description:
-          error instanceof Error ? error.message : "Unknown diagnostics error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not load diagnostics."),
         tone: "error",
       });
     } finally {
@@ -87,7 +84,7 @@ export function HealthPage(): JSX.Element {
       },
       {
         title: "Subscription",
-        value: `${getPlanDisplayName(subscription.plan)} - ${subscription.status}`,
+        value: getPlanDisplayName(subscription.plan),
         description: `Last verified ${formatAbsoluteDate(subscription.lastVerifiedAt)}.`,
         tone:
           subscription.status === "active" || subscription.plan === "free"
@@ -102,25 +99,6 @@ export function HealthPage(): JSX.Element {
         tone: latestSyncError ? "danger" : "success",
       },
       {
-        title: "Desktop Bridge",
-        value: bridgeState.port
-          ? `${bridgeState.host}:${bridgeState.port}`
-          : bridgeState.status,
-        description: `Bridge status: ${bridgeState.status}. Protocol ${bridgeState.protocolVersion}.`,
-        tone:
-          bridgeState.status === "connected" || bridgeState.status === "waiting"
-            ? "success"
-            : "warning",
-      },
-      {
-        title: "Extension",
-        value: bridgeState.extensionConnected ? "Connected" : "Waiting",
-        description: bridgeState.extensionConnected
-          ? `${bridgeState.registeredWorkspaceCount} workspace path(s) registered.`
-          : "VS Code Terminal needs the Projecto editor extension.",
-        tone: bridgeState.extensionConnected ? "success" : "warning",
-      },
-      {
         title: "Editor",
         value: "VS Code",
         description: "VS Code is the desktop editor for Projecto.",
@@ -129,16 +107,11 @@ export function HealthPage(): JSX.Element {
       {
         title: "Terminal",
         value: formatTerminalStrategyLabel(settings),
-        description:
-          isVscodeTerminalStrategy(settings.terminalStrategy)
-            ? "Commands are routed to the Projecto extension bridge."
-            : "Commands run through Projecto with mirrored output.",
+        description: "Commands open in Windows Terminal with mirrored output.",
         tone: "neutral",
       },
     ],
-    [
-      bridgeState,
-      lastSyncedAt,
+    [      lastSyncedAt,
       latestSyncError,
       online,
       settings,
@@ -166,10 +139,7 @@ export function HealthPage(): JSX.Element {
                 } catch (error) {
                   pushToast({
                     title: "Refresh failed",
-                    description:
-                      error instanceof Error
-                        ? error.message
-                        : "Unable to refresh subscription.",
+                    description: getFriendlyErrorMessage(error, "Projecto could not refresh health data."),
                     tone: "error",
                   });
                 }
@@ -185,7 +155,7 @@ export function HealthPage(): JSX.Element {
             </Button>{" "}
           </>
         }
-        description="Check Projecto Desktop, account sync, the extension bridge, and recent launch failures from one place."
+        description="Check Projecto Desktop, account sync, terminal state, and recent launch failures from one place."
         eyebrow="Diagnostics"
         title="Projecto Health"
       />{" "}
@@ -201,6 +171,7 @@ export function HealthPage(): JSX.Element {
           />
         ))}{" "}
       </div>{" "}
+      <RunningPortsPanel />{" "}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
         {" "}
         <PremiumCard className="p-5">
@@ -232,7 +203,7 @@ export function HealthPage(): JSX.Element {
             />{" "}
             <DiagnosticItem
               label="Protocol"
-              value={report?.protocolVersion ?? bridgeState.protocolVersion}
+              value={report?.protocolVersion ?? "unknown"}
             />{" "}
             <DiagnosticItem
               label="Platform"

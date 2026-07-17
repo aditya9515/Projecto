@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import type {
-  AppSettings,
-  DesktopBridgeState,
   Project,
   ProjectTerminalSession,
 } from "../../types/shared";
@@ -43,25 +41,10 @@ describe("renderer terminal launch-state helpers", () => {
     updatedAt: new Date().toISOString(),
     missingFolder: false,
   };
-  const settings: AppSettings = {
-    defaultEditor: "vscode",
-    terminalStrategy: "os-internal",
-    telemetryEnabled: false,
-    askBeforeRunningNewCommands: true,
-    launchOnStartup: true,
-    hasCompletedOnboarding: true,
-  };
-  const bridgeState: DesktopBridgeState = {
-    status: "connected",
-    host: "127.0.0.1",
-    protocolVersion: "0.1.0",
-    extensionConnected: true,
-    registeredWorkspaceCount: 1,
-  };
 
   function session(
     status: ProjectTerminalSession["status"],
-    terminalStrategy: ProjectTerminalSession["terminalStrategy"] = "os-internal",
+    terminalStrategy: ProjectTerminalSession["terminalStrategy"] = "os-external",
   ): ProjectTerminalSession {
     return {
       projectId: project.id,
@@ -116,18 +99,12 @@ describe("renderer terminal launch-state helpers", () => {
         session("ready"),
       ),
     ).toBe("locked");
-    expect(formatTerminalStrategyLabel(session("ready", "os-internal"))).toBe(
-      "OS Terminal",
-    );
-    expect(formatTerminalStrategyLabel(session("ready", "os-external"))).toBe(
-      "OS Terminal",
-    );
     expect(
-      formatTerminalStrategyLabel(session("ready", "vscode-internal")),
-    ).toBe("VS Code Terminal");
+      formatTerminalStrategyLabel(session("ready", "os-external")),
+    ).toBe("Windows Terminal");
     expect(
-      formatTerminalStrategyLabel(session("ready", "vscode-external")),
-    ).toBe("VS Code Terminal");
+      formatTerminalStrategyLabel(session("ready", "os-external")),
+    ).toBe("Windows Terminal");
   });
 
   it("marks locked projects as locked before other health checks", () => {
@@ -138,8 +115,6 @@ describe("renderer terminal launch-state helpers", () => {
           lockedBySubscription: true,
           missingFolder: true,
         },
-        settings,
-        bridgeState,
       }),
     ).toBe("locked");
   });

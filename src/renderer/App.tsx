@@ -16,10 +16,8 @@ import { AppShell } from "./components/layout/AppShell";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
 import { HomePage } from "./routes/HomePage";
-import { AccountPage } from "./routes/AccountPage";
 import { HealthPage } from "./routes/HealthPage";
 import { ImportPage } from "./routes/ImportPage";
-import { PricingPage } from "./routes/PricingPage";
 import { ProjectDetailPage } from "./routes/ProjectDetailPage";
 import { ProjectsPage } from "./routes/ProjectsPage";
 import { SettingsPage } from "./routes/SettingsPage";
@@ -28,6 +26,7 @@ import { useProjectsStore } from "./store/useProjectsStore";
 import { useSettingsStore } from "./store/useSettingsStore";
 import { useSubscriptionStore } from "./store/useSubscriptionStore";
 import { useToastStore } from "./store/useToastStore";
+import { getFriendlyErrorMessage } from "./utils/errors";
 export default function App(): JSX.Element {
   return typeof window.launchStack !== "undefined" ? (
     <AppContent />
@@ -88,10 +87,7 @@ function AppContent(): JSX.Element {
             } catch (error) {
               pushToast({
                 title: "Still offline",
-                description:
-                  error instanceof Error
-                    ? error.message
-                    : "Projecto could not reconnect yet.",
+                description: getFriendlyErrorMessage(error, "Projecto could not reconnect yet."),
                 tone: "error",
               });
             }
@@ -123,9 +119,9 @@ function AppContent(): JSX.Element {
                 <Route element={<ImportPage />} path="/import" />{" "}
                 <Route element={<ProjectsPage />} path="/projects" />{" "}
                 <Route element={<ProjectDetailPage />} path="/projects/:id" />{" "}
-                <Route element={<AccountPage />} path="/account" />{" "}
+                <Route element={<Navigate replace to="/settings" />} path="/account" />{" "}
                 <Route element={<HealthPage />} path="/health" />{" "}
-                <Route element={<PricingPage />} path="/pricing" />{" "}
+                <Route element={<Navigate replace to="/settings" />} path="/pricing" />{" "}
                 <Route element={<SettingsPage />} path="/settings" />{" "}
                 <Route element={<Navigate replace to="/" />} path="*" />{" "}
               </Routes>{" "}
@@ -147,10 +143,7 @@ function AppContent(): JSX.Element {
           } catch (error) {
             pushToast({
               title: "Unable to refresh subscription",
-              description:
-                error instanceof Error
-                  ? error.message
-                  : "Unknown subscription error.",
+              description: getFriendlyErrorMessage(error, "Projecto could not refresh your subscription."),
               tone: "error",
             });
           }
@@ -161,10 +154,7 @@ function AppContent(): JSX.Element {
           } catch (error) {
             pushToast({
               title: "Unable to start sign-in",
-              description:
-                error instanceof Error
-                  ? error.message
-                  : "Unknown sign-in error.",
+              description: getFriendlyErrorMessage(error, "Projecto could not start sign-in."),
               tone: "error",
             });
           }
@@ -175,10 +165,7 @@ function AppContent(): JSX.Element {
           } catch (error) {
             pushToast({
               title: "Unable to open billing page",
-              description:
-                error instanceof Error
-                  ? error.message
-                  : "Unknown billing error.",
+              description: getFriendlyErrorMessage(error, "Projecto could not open the billing page."),
               tone: "error",
             });
           }
@@ -197,7 +184,7 @@ function AppContent(): JSX.Element {
           }}
           onOpenUpgrade={() => {
             openUpgradeModal("projects");
-            navigate("/pricing");
+            navigate("/settings");
           }}
           onSkip={async () => {
             await updateSettings({ hasCompletedOnboarding: true });
@@ -264,8 +251,7 @@ function ProjectoUnavailable(): JSX.Element {
         <p className="mt-4 text-sm leading-6 text-muted">
           {" "}
           The secure desktop API is not available in this window. Open Projecto
-          from the installed desktop app so it can access local folders, launch
-          commands, and communicate with your editor extension safely.{" "}
+          from the installed desktop app so it can access local folders and launch commands safely.{" "}
         </p>{" "}
       </div>{" "}
     </div>

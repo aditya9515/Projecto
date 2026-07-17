@@ -31,7 +31,6 @@ import {
   CommandSafetyService,
   type CommandApprovalOptions,
 } from "./commandSafetyService";
-import { DesktopBridgeService } from "./desktopBridgeService";
 import { EditorService } from "./editorService";
 import { ProjectStore } from "./projectStore";
 import { SettingsStore } from "./settingsStore";
@@ -49,8 +48,6 @@ import {
 const urlSchema = z.string().url();
 const BROWSER_URL_DETECTION_TIMEOUT_MS = 15_000;
 const DETECTED_URL_SETTLE_MS = 500;
-const EDITOR_WORKSPACE_REGISTRATION_TIMEOUT_MS = 12_000;
-const EDITOR_WORKSPACE_REGISTRATION_POLL_MS = 250;
 
 type ActiveRunMetadata = {
   projectId: string;
@@ -85,33 +82,17 @@ function buildExternalTerminalTitle(
 }
 
 function isOsTerminalStrategy(
-  terminalStrategy: RunEvent["executionMode"],
-): boolean {
-  return (
-    terminalStrategy === "os-internal" || terminalStrategy === "os-external"
-  );
-}
-
-function isVisibleOsTerminalStrategy(
-  terminalStrategy: RunEvent["executionMode"],
+  terminalStrategy?: string,
 ): boolean {
   return terminalStrategy === "os-external";
 }
 
-function isVscodeTerminalStrategy(
-  terminalStrategy: RunEvent["executionMode"],
+function isVisibleOsTerminalStrategy(
+  terminalStrategy?: string,
 ): boolean {
-  return (
-    terminalStrategy === "vscode-internal" ||
-    terminalStrategy === "vscode-external"
-  );
+  return terminalStrategy === "os-external";
 }
 
-function getVscodeTerminalLocation(
-  terminalStrategy: RunEvent["executionMode"],
-): "panel" | "editor" {
-  return terminalStrategy === "vscode-external" ? "editor" : "panel";
-}
 
 async function canReachUrl(url: string): Promise<boolean> {
   const controller = new AbortController();
@@ -162,6 +143,12 @@ function isActiveTerminalSession(session: ProjectTerminalSession): boolean {
     session.status === "ready" ||
     session.status === "stopping"
   );
+}
+
+function isClearableStoppingTerminalSession(
+  session: ProjectTerminalSession,
+): boolean {
+  return session.status === "stopping";
 }
 
 function mergeDetectedPorts(
@@ -218,13 +205,9 @@ export class LauncherService {
     private readonly externalUrlService: ExternalUrlService,
     private readonly subscriptionService: SubscriptionService,
     private readonly commandSafetyService: CommandSafetyService,
-    private readonly desktopBridgeService: DesktopBridgeService,
     private readonly terminalSessionStore: TerminalSessionStore,
   ) {
     this.commandRunner.onRunEvent((event) => {
-      this.handleRunEvent(RunEventSchema.parse(event));
-    });
-    this.desktopBridgeService.onRunEvent((event) => {
       this.handleRunEvent(RunEventSchema.parse(event));
     });
   }
@@ -249,7 +232,7 @@ export class LauncherService {
   }
 
   async getTerminalSessions(): Promise<ProjectTerminalSession[]> {
-    return this.terminalSessionStore.getSessions();
+    return this.getSessionsWithStaleStoppingCleared();
   }
 
   async revealProjectTerminal(
@@ -261,25 +244,9 @@ export class LauncherService {
     if (!session) {
       throw new Error("No mapped terminal session was found for this project.");
     }
-
-    if (isVscodeTerminalStrategy(session.terminalStrategy)) {
-      await this.desktopBridgeService.revealProjectTerminal({
-        projectId: session.projectId,
-        projectPath: session.projectPath,
-        runId: session.activeRunId,
-      });
-      await this.updateTerminalSession(projectId, {
-        status: "stopping",
-        lastMessage:
-          "VS Code terminal revealed. Stop requested through Projecto.",
-      });
-      this.stoppingProjectIds.add(projectId);
-      return session;
-    }
-
     if (!isVisibleOsTerminalStrategy(session.terminalStrategy)) {
       throw new Error(
-        "This project is running as an internal background process. Use Stop to end it; there is no terminal window to reveal.",
+        "No visible Windows Terminal window is mapped to this project. Stop the project or launch it again.",
       );
     }
 
@@ -297,13 +264,9 @@ export class LauncherService {
         "The mapped OS terminal could not be found. Projecto cleared the stale session; launch the project again to start a fresh terminal.",
       );
     }
-
     await this.updateTerminalSession(projectId, {
-      status: "stopping",
-      lastMessage:
-        "OS terminal window revealed. Stop the project from Projecto when possible.",
+      lastMessage: "OS terminal window revealed.",
     });
-    this.stoppingProjectIds.add(projectId);
 
     return session;
   }
@@ -366,20 +329,8 @@ export class LauncherService {
       [{ project, command }],
       options,
     );
-
     const settings = await this.settingsStore.getSettings();
-    if (isVscodeTerminalStrategy(settings.terminalStrategy)) {
-      await this.editorService.openProjectEditor(project, settings);
-    }
-
-    const result = await this.runCommandWithStrategy(
-      project,
-      command,
-      settings,
-      {
-        editorAlreadyOpen: isVscodeTerminalStrategy(settings.terminalStrategy),
-      },
-    );
+    const result = await this.runCommandWithStrategy(project, command, settings);
     await this.createTerminalSession(project, settings.terminalStrategy, {
       runIds: [result.runId],
       activeRunId: result.runId,
@@ -445,10 +396,7 @@ export class LauncherService {
 
     const settings = await this.settingsStore.getSettings();
     const launchId = randomUUID();
-    const shouldOpenEditor =
-      profile.openEditor ||
-      (isVscodeTerminalStrategy(settings.terminalStrategy) &&
-        selectedCommands.length > 0);
+    const shouldOpenEditor = profile.openEditor;
     const expectsBrowser =
       profile.openBrowser &&
       (profile.browserUrls.length > 0 || selectedCommands.length > 0);
@@ -468,13 +416,9 @@ export class LauncherService {
     });
 
     if (shouldOpenEditor) {
-      await this.editorService.openProjectEditor(
-        project,
-        settings,
-        isVscodeTerminalStrategy(settings.terminalStrategy)
-          ? undefined
-          : { reuseWindow: false },
-      );
+      await this.editorService.openProjectEditor(project, settings, {
+        reuseWindow: false,
+      });
     }
 
     if (profile.openFolder) {
@@ -495,16 +439,10 @@ export class LauncherService {
 
     try {
       for (const command of selectedCommands) {
-        const result = await this.runCommandWithStrategy(
-          project,
-          command,
-          settings,
-          {
-            launchId,
-            profileId: profile.id,
-            editorAlreadyOpen: shouldOpenEditor,
-          },
-        );
+        const result = await this.runCommandWithStrategy(project, command, settings, {
+          launchId,
+          profileId: profile.id,
+        });
         startedResults.push(result);
       }
     } catch (error) {
@@ -597,11 +535,6 @@ export class LauncherService {
 
   stopRun(runId: string): boolean {
     const metadata = this.activeRunMetadata.get(runId);
-
-    if (isVscodeTerminalStrategy(metadata?.executionMode)) {
-      return this.desktopBridgeService.stopEditorTerminalRun(runId);
-    }
-
     if (isOsTerminalStrategy(metadata?.executionMode)) {
       return this.commandRunner.stopRun(runId);
     }
@@ -679,6 +612,23 @@ export class LauncherService {
     }
 
     return this.commandSafetyService.getCommandSafety(project);
+  }
+
+  private async getSessionsWithStaleStoppingCleared(): Promise<
+    ProjectTerminalSession[]
+  > {
+    const sessions = await this.terminalSessionStore.getSessions();
+    const clearableStoppingSessions = sessions.filter(isClearableStoppingTerminalSession);
+
+    if (clearableStoppingSessions.length === 0) {
+      return sessions;
+    }
+
+    for (const session of clearableStoppingSessions) {
+      await this.clearTerminalSession(session.projectId);
+    }
+
+    return this.terminalSessionStore.getSessions();
   }
 
   private trackActiveRun(event: RunEvent): void {
@@ -768,7 +718,7 @@ export class LauncherService {
       return;
     }
 
-    const sessions = await this.terminalSessionStore.getSessions();
+    const sessions = await this.getSessionsWithStaleStoppingCleared();
     const activeProjectIds = new Set(
       sessions
         .filter(isActiveTerminalSession)
@@ -801,7 +751,7 @@ export class LauncherService {
       throw createProjectAlreadyRunningError(projectId);
     }
 
-    const sessions = await this.terminalSessionStore.getSessions();
+    const sessions = await this.getSessionsWithStaleStoppingCleared();
     const activeSession = sessions.find(
       (session) =>
         session.projectId === projectId && isActiveTerminalSession(session),
@@ -826,7 +776,7 @@ export class LauncherService {
       return;
     }
 
-    const sessions = await this.terminalSessionStore.getSessions();
+    const sessions = await this.getSessionsWithStaleStoppingCleared();
     this.refreshProjectPortRegistry(sessions);
 
     for (const requestedPort of requestedPorts) {
@@ -1187,54 +1137,17 @@ export class LauncherService {
     options?: {
       launchId?: string;
       profileId?: string;
-      editorAlreadyOpen?: boolean;
     },
   ): Promise<CommandRunResult> {
-    if (isOsTerminalStrategy(settings.terminalStrategy)) {
-      return this.commandRunner.runCommand({
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        command,
-        terminalStrategy: settings.terminalStrategy,
-        launchId: options?.launchId,
-        profileId: options?.profileId,
-      });
-    }
-
-    if (!(await this.waitForEditorWorkspaceConnection(project.path))) {
-      throw new Error(
-        "VS Code terminal mode requires the Projecto VS Code extension. Projecto opened VS Code, but the extension did not register this workspace before the timeout. Reopen VS Code or choose an OS Terminal mode.",
-      );
-    }
-
-    return this.desktopBridgeService.runCommandInEditorTerminal(
-      project,
+    return this.commandRunner.runCommand({
+      projectId: project.id,
+      projectName: project.name,
+      projectPath: project.path,
       command,
-      {
-        launchId: options?.launchId,
-        profileId: options?.profileId,
-        terminalLocation: getVscodeTerminalLocation(settings.terminalStrategy),
-      },
-    );
-  }
-
-  private async waitForEditorWorkspaceConnection(
-    projectPath: string,
-  ): Promise<boolean> {
-    const startedAt = Date.now();
-
-    while (
-      Date.now() - startedAt < EDITOR_WORKSPACE_REGISTRATION_TIMEOUT_MS
-    ) {
-      if (this.desktopBridgeService.hasConnectedEditorForPath(projectPath)) {
-        return true;
-      }
-
-      await sleep(EDITOR_WORKSPACE_REGISTRATION_POLL_MS);
-    }
-
-    return this.desktopBridgeService.hasConnectedEditorForPath(projectPath);
+      terminalStrategy: settings.terminalStrategy,
+      launchId: options?.launchId,
+      profileId: options?.profileId,
+    });
   }
 
   private handleRunEvent(inputEvent: RunEvent): void {

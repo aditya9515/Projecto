@@ -4,6 +4,7 @@ import type {
   TerminalStrategy,
 } from "../../main/types/shared";
 import { isProjectLockedBySubscription } from "../../billing/upgradeGate";
+
 export type ProjectLaunchButtonState =
   | "launch"
   | "locked"
@@ -12,6 +13,7 @@ export type ProjectLaunchButtonState =
   | "stopping"
   | "failed"
   | "disabled";
+
 export function getProjectLaunchButtonState(
   project: Project,
   session?: ProjectTerminalSession,
@@ -39,42 +41,21 @@ export function getProjectLaunchButtonState(
   }
   return "launch";
 }
+
 export function formatTerminalStrategyLabel(
   session?:
     | Pick<ProjectTerminalSession, "terminalStrategy">
     | { terminalStrategy?: TerminalStrategy },
 ): string {
-  switch (session?.terminalStrategy) {
-    case "os-internal":
-    case "os-external":
-      return "OS Terminal";
-    case "vscode-internal":
-    case "vscode-external":
-      return "VS Code Terminal";
-    default:
-      return "OS Terminal";
-  }
+  void session;
+  return "Windows Terminal";
 }
-export function isVscodeTerminalStrategy(
-  terminalStrategy?: TerminalStrategy,
-): boolean {
-  return (
-    terminalStrategy === "vscode-internal" ||
-    terminalStrategy === "vscode-external"
-  );
-}
+
 export function formatTerminalControlLabel(
   terminalStrategy?: TerminalStrategy,
   managed?: boolean,
 ): string {
-  if (terminalStrategy === "os-internal" || terminalStrategy === "os-external") {
-    return managed === false ? "OS terminal" : "Projecto terminal";
-  }
-  if (
-    terminalStrategy === "vscode-internal" ||
-    terminalStrategy === "vscode-external"
-  ) {
-    return "VS Code terminal";
-  }
-  return "Projecto terminal";
+  void terminalStrategy;
+  void managed;
+  return "Windows Terminal";
 }

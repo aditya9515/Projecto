@@ -19,6 +19,7 @@ import {
   getRunnableProfileCommands,
 } from "../utils/launch";
 import { handleMappedLaunchError } from "../utils/launchErrorHandlers";
+import { getFriendlyErrorMessage } from "../utils/errors";
 import { getProjectHealthStatus } from "../utils/projectHealth";
 import { getProjectLaunchButtonState } from "../utils/terminalSessions";
 type PendingLaunch = { project: Project; profile: LaunchProfile };
@@ -31,7 +32,6 @@ export function ProjectsPage(): JSX.Element {
   const toggleFavorite = useProjectsStore((state) => state.toggleFavorite);
   const deleteProject = useProjectsStore((state) => state.deleteProject);
   const settings = useSettingsStore((state) => state.settings);
-  const bridgeState = useAppStatusStore((state) => state.bridgeState);
   const recentLaunchFailures = useAppStatusStore(
     (state) => state.recentLaunchFailures,
   );
@@ -66,8 +66,6 @@ export function ProjectsPage(): JSX.Element {
       project.id,
       getProjectHealthStatus({
         project,
-        settings,
-        bridgeState,
         recentLaunchFailures,
         commandSafety: commandSafetyByProjectId[project.id] ?? [],
       }),
@@ -108,8 +106,7 @@ export function ProjectsPage(): JSX.Element {
       }
       pushToast({
         title: "Unable to launch project",
-        description:
-          error instanceof Error ? error.message : "Unknown launch error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not launch this project."),
         tone: "error",
       });
     }
@@ -130,6 +127,27 @@ export function ProjectsPage(): JSX.Element {
     }
     void runLaunch(project, profile);
   }
+  function handleRevealTerminal(project: Project): void {
+    void window.launchStack.launcher
+      .revealProjectTerminal(project.id)
+      .then(() => {
+        pushToast({
+          title: "Mapped terminal",
+          description: `Opening terminal for ${project.name}.`,
+          tone: "success",
+        });
+      })
+      .catch((error) => {
+        pushToast({
+          title: "Mapped terminal unavailable",
+          description: getFriendlyErrorMessage(
+            error,
+            "Projecto could not open the mapped terminal for this project.",
+          ),
+          tone: "error",
+        });
+      });
+  }
   function handleStopProject(project: Project): void {
     void window.launchStack.launcher
       .stopProjectTerminal(project.id)
@@ -145,8 +163,8 @@ export function ProjectsPage(): JSX.Element {
           title: "Unable to stop project",
           description:
             error instanceof Error
-              ? error.message
-              : "Unknown project stop error.",
+              ? getFriendlyErrorMessage(error)
+              : "Projecto could not stop this project launch.",
           tone: "error",
         });
       });
@@ -176,8 +194,7 @@ export function ProjectsPage(): JSX.Element {
       }
       pushToast({
         title: "Unable to remove project",
-        description:
-          error instanceof Error ? error.message : "Unknown removal error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not remove this project."),
         tone: "error",
       });
     } finally {
@@ -206,10 +223,7 @@ export function ProjectsPage(): JSX.Element {
             void startGoogleSignIn().catch((error) => {
               pushToast({
                 title: "Unable to open Projecto sign-in",
-                description:
-                  error instanceof Error
-                    ? error.message
-                    : "Unknown sign-in error.",
+                description: getFriendlyErrorMessage(error, "Projecto could not start sign-in."),
                 tone: "error",
               });
             });
@@ -219,10 +233,10 @@ export function ProjectsPage(): JSX.Element {
       ) : projects.length === 0 &&
         (subscription.archivedProjectCount ?? 0) > 0 ? (
         <EmptyState
-          actionLabel="View Pricing"
-          description={`${subscription.archivedProjectCount} project${subscription.archivedProjectCount === 1 ? "" : "s"} are hidden on Standard. Upgrade to Pro to restore them automatically.`}
-          onAction={() => navigate("/pricing")}
-          title="Projects hidden by Standard limit"
+          actionLabel="Open Settings"
+          description={`${subscription.archivedProjectCount} project${subscription.archivedProjectCount === 1 ? "" : "s"} are locked by your plan. Upgrade to Plus to unlock them.`}
+          onAction={() => navigate("/settings")}
+          title="Projects locked by plan"
         />
       ) : filteredProjects.length === 0 ? (
         <EmptyState
@@ -243,6 +257,7 @@ export function ProjectsPage(): JSX.Element {
               )}
               onLaunch={handleLaunch}
               onStopProject={handleStopProject}
+              onRevealTerminal={handleRevealTerminal}
               onOpenEditor={(entry) =>
                 void window.launchStack.launcher.openEditor(entry.id)
               }

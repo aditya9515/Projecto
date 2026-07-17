@@ -1,36 +1,45 @@
 import { useEffect, useState } from "react";
 import { parseUpgradeReason } from "../../billing/upgradeGate";
-import type {
-  AppSettingsUpdate,
-  DesktopBridgeState,
-} from "../../main/types/shared";
+import type { AppSettingsUpdate } from "../../main/types/shared";
+import { AccountBillingSettings } from "../components/settings/AccountBillingSettings";
 import { SettingsForm } from "../components/settings/SettingsForm";
+import { useAppStatusStore } from "../store/useAppStatusStore";
+import { useProjectsStore } from "../store/useProjectsStore";
 import { useSettingsStore } from "../store/useSettingsStore";
+import { useSubscriptionStore } from "../store/useSubscriptionStore";
 import { useToastStore } from "../store/useToastStore";
+import { getFriendlyErrorMessage } from "../utils/errors";
+
 type SaveStatus = "idle" | "saving" | "saved" | "failed";
+
 export function SettingsPage(): JSX.Element {
   const settings = useSettingsStore((state) => state.settings);
   const initialized = useSettingsStore((state) => state.initialized);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const updateSettings = useSettingsStore((state) => state.updateSettings);
-  const pushToast = useToastStore((state) => state.pushToast);
-  const [bridgeState, setBridgeState] = useState<DesktopBridgeState | null>(
-    null,
+  const subscription = useSubscriptionStore((state) => state.subscription);
+  const subscriptionLoading = useSubscriptionStore((state) => state.loading);
+  const startGoogleSignIn = useSubscriptionStore(
+    (state) => state.startGoogleSignIn,
   );
+  const refreshSubscription = useSubscriptionStore(
+    (state) => state.refreshSubscription,
+  );
+  const openUpgradePage = useSubscriptionStore(
+    (state) => state.openUpgradePage,
+  );
+  const online = useAppStatusStore((state) => state.online);
+  const projects = useProjectsStore((state) => state.projects);
+  const pushToast = useToastStore((state) => state.pushToast);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveMessage, setSaveMessage] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     if (!initialized) {
       void loadSettings();
     }
   }, [initialized, loadSettings]);
-  useEffect(() => {
-    void window.launchStack.launcher
-      .getBridgeState()
-      .then(setBridgeState)
-      .catch(() => undefined);
-    return window.launchStack.launcher.onBridgeState(setBridgeState);
-  }, []);
+
   async function handleSettingsChange(patch: AppSettingsUpdate): Promise<void> {
     setSaveStatus("saving");
     setSaveMessage("Saving...");
@@ -40,27 +49,20 @@ export function SettingsPage(): JSX.Element {
       setSaveMessage("Saved");
     } catch (error) {
       const upgradeReason = parseUpgradeReason(error);
-      if (upgradeReason) {
-        setSaveStatus("failed");
-        setSaveMessage("Upgrade required");
-        pushToast({
-          title: "Upgrade required",
-          description: `This setting requires ${upgradeReason}.`,
-          tone: "error",
-        });
-        throw error;
-      }
       setSaveStatus("failed");
-      setSaveMessage("Failed to save");
+      setSaveMessage(upgradeReason ? "Upgrade required" : "Failed to save");
       pushToast({
-        title: "Unable to save settings",
-        description:
-          error instanceof Error ? error.message : "Unknown settings error.",
+        title: upgradeReason ? "Upgrade required" : "Unable to save settings",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not save this setting. Refresh and try again.",
+        ),
         tone: "error",
       });
       throw error;
     }
   }
+
   async function runDiagnosticAction<T>(
     action: () => Promise<T>,
     successTitle: string,
@@ -77,12 +79,15 @@ export function SettingsPage(): JSX.Element {
     } catch (error) {
       pushToast({
         title: "Diagnostic action failed",
-        description:
-          error instanceof Error ? error.message : "Unknown diagnostic error.",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not complete this diagnostic action.",
+        ),
         tone: "error",
       });
     }
   }
+
   async function handleTestEditor(): Promise<void> {
     try {
       const result = await window.launchStack.diagnostics.testEditor();
@@ -94,12 +99,15 @@ export function SettingsPage(): JSX.Element {
     } catch (error) {
       pushToast({
         title: "Editor test failed",
-        description:
-          error instanceof Error ? error.message : "Unknown editor test error.",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not test VS Code on this device.",
+        ),
         tone: "error",
       });
     }
   }
+
   async function handleTestTerminal(): Promise<void> {
     try {
       const result = await window.launchStack.diagnostics.testTerminal();
@@ -111,60 +119,106 @@ export function SettingsPage(): JSX.Element {
     } catch (error) {
       pushToast({
         title: "Terminal test failed",
-        description:
-          error instanceof Error ? error.message : "Unknown terminal test error.",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not test the OS terminal on this device.",
+        ),
         tone: "error",
       });
     }
   }
-  async function handleRefreshBridge(): Promise<void> {
+
+  async function handleSignIn(): Promise<void> {
     try {
-      const nextBridgeState = await window.launchStack.launcher.getBridgeState();
-      setBridgeState(nextBridgeState);
+      await startGoogleSignIn();
+    } catch (error) {
       pushToast({
-        title: "Bridge refreshed",
-        description: nextBridgeState.extensionConnected
-          ? "Projecto editor extension is connected."
-          : "Bridge is running, but the editor extension is not connected yet.",
+        title: "Unable to start sign-in",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not open the browser sign-in flow.",
+        ),
+        tone: "error",
+      });
+    }
+  }
+
+  async function handleRefreshSubscription(): Promise<void> {
+    try {
+      await refreshSubscription();
+      pushToast({
+        title: "Subscription refreshed",
+        description:
+          "Projecto updated this device with the latest account and plan state.",
         tone: "success",
       });
     } catch (error) {
       pushToast({
-        title: "Bridge refresh failed",
-        description:
-          error instanceof Error ? error.message : "Unknown bridge refresh error.",
+        title: "Unable to refresh subscription",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not refresh your subscription right now.",
+        ),
         tone: "error",
       });
     }
   }
+
+  async function handleOpenBilling(): Promise<void> {
+    try {
+      await openUpgradePage();
+    } catch (error) {
+      pushToast({
+        title: "Unable to open billing page",
+        description: getFriendlyErrorMessage(
+          error,
+          "Projecto could not open the web billing page.",
+        ),
+        tone: "error",
+      });
+    }
+  }
+
   return (
-    <SettingsForm
-      onExportDiagnostics={() =>
-        runDiagnosticAction(
-          () => window.launchStack.diagnostics.exportReport(),
-          "Diagnostics exported",
-        )
-      }
-      onOpenAppDataFolder={() =>
-        runDiagnosticAction(
-          () => window.launchStack.diagnostics.openAppDataFolder(),
-          "App data folder opened",
-        )
-      }
-      onRefreshBridge={handleRefreshBridge}
-      onResetCommandApprovals={() =>
-        runDiagnosticAction(
-          () => window.launchStack.diagnostics.resetCommandApprovals(),
-          "Command approvals reset",
-        )
-      }
-      onSettingsChange={handleSettingsChange}
-      onTestEditor={handleTestEditor}
-      onTestTerminal={handleTestTerminal}
-      saveMessage={saveMessage}
-      saveStatus={saveStatus}
-      settings={settings}
-      bridgeState={bridgeState}
-    />
+    <div className="space-y-6">
+      <AccountBillingSettings
+        loading={subscriptionLoading}
+        lockedProjectCount={
+          projects.filter((project) => project.lockedBySubscription).length
+        }
+        onOpenBilling={handleOpenBilling}
+        onRefreshSubscription={handleRefreshSubscription}
+        onSignIn={handleSignIn}
+        online={online}
+        projectCount={projects.length}
+        subscription={subscription}
+      />
+      <SettingsForm
+        onExportDiagnostics={() =>
+          runDiagnosticAction(
+            () => window.launchStack.diagnostics.exportReport(),
+            "Diagnostics exported",
+          )
+        }
+        onOpenAppDataFolder={() =>
+          runDiagnosticAction(
+            () => window.launchStack.diagnostics.openAppDataFolder(),
+            "App data folder opened",
+          )
+        }
+        onResetCommandApprovals={() =>
+          runDiagnosticAction(
+            () => window.launchStack.diagnostics.resetCommandApprovals(),
+            "Command approvals reset",
+          )
+        }
+        onSettingsChange={handleSettingsChange}
+        onTestEditor={handleTestEditor}
+        onTestTerminal={handleTestTerminal}
+        saveMessage={saveMessage}
+        saveStatus={saveStatus}
+        settings={settings}
+      />
+    </div>
   );
 }

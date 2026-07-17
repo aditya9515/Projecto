@@ -5,7 +5,6 @@ import {
   FolderTree,
   ListFilter,
   Play,
-  Rocket,
   ShieldCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +18,7 @@ import type {
   DetectionResult,
   LaunchCommand,
 } from "../../main/types/shared";
+import { AppIcon } from "../components/common/AppIcon";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
 import { InlineWarning } from "../components/common/InlineWarning";
@@ -31,6 +31,7 @@ import { useSettingsStore } from "../store/useSettingsStore";
 import { useSubscriptionStore } from "../store/useSubscriptionStore";
 import { useToastStore } from "../store/useToastStore";
 import { handleMappedLaunchError } from "../utils/launchErrorHandlers";
+import { getFriendlyErrorMessage } from "../utils/errors";
 type ImportStep = "type" | "folder" | "scan" | "configure" | "finish";
 type ImportType = "single" | "bulk";
 const steps: Array<{ id: ImportStep; label: string }> = [
@@ -214,8 +215,7 @@ export function ImportPage(): JSX.Element {
     } catch (error) {
       pushToast({
         title: "Unable to scan folder",
-        description:
-          error instanceof Error ? error.message : "Unknown scan error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not scan this folder."),
         tone: "error",
       });
     } finally {
@@ -276,8 +276,7 @@ export function ImportPage(): JSX.Element {
       }
       pushToast({
         title: "Unable to scan workspace",
-        description:
-          error instanceof Error ? error.message : "Unknown bulk import error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not scan this workspace."),
         tone: "error",
       });
     } finally {
@@ -350,8 +349,7 @@ export function ImportPage(): JSX.Element {
       }
       pushToast({
         title: "Unable to save project",
-        description:
-          error instanceof Error ? error.message : "Unknown save error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not save this project."),
         tone: "error",
       });
     } finally {
@@ -406,8 +404,7 @@ export function ImportPage(): JSX.Element {
       }
       pushToast({
         title: "Bulk import failed",
-        description:
-          error instanceof Error ? error.message : "Unknown import error.",
+        description: getFriendlyErrorMessage(error, "Projecto could not complete the bulk import."),
         tone: "error",
       });
     } finally {
@@ -456,10 +453,10 @@ export function ImportPage(): JSX.Element {
           <ImportTypeCard
             active={importType === "single"}
             description="Import one project folder, review its detected stack, and create a default launch profile."
-            icon={<Rocket className="h-5 w-5" />}
+            icon={<AppIcon className="h-5 w-5" />}
             label="Single project"
             locked={!singleImportUnlocked}
-            lockLabel="Standard limit"
+            lockLabel="Plan limit"
             onClick={() => {
               if (!singleImportUnlocked) {
                 openUpgradeModal("projects");
@@ -471,11 +468,11 @@ export function ImportPage(): JSX.Element {
           />{" "}
           <ImportTypeCard
             active={importType === "bulk"}
-            description="Scan a parent workspace and import many detected project folders. Available on Pro."
+            description="Scan a parent workspace and import many detected project folders. Available on Plus."
             icon={<Boxes className="h-5 w-5" />}
             label="Workspace bulk import"
             locked={!bulkImportUnlocked}
-            lockLabel="Pro"
+            lockLabel="Plus"
             onClick={() => {
               if (!bulkImportUnlocked) {
                 openUpgradeModal("bulkImport");
@@ -749,7 +746,7 @@ function ImportTypeCard({
   icon,
   active,
   locked = false,
-  lockLabel = "Pro",
+  lockLabel = "Plus",
   onClick,
 }: {
   label: string;

@@ -57,7 +57,7 @@ export function UpgradeModal({
                       </div>
                       <div>
                         <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
-                          Projecto Pro
+                          Projecto Plus
                         </div>
                         <Dialog.Title className="mt-2 text-3xl font-semibold tracking-tight text-text">
                           {copy.title}
@@ -74,7 +74,7 @@ export function UpgradeModal({
                   <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
                     <div className="app-soft-surface rounded-[28px] border border-line p-5">
                       <div className="text-sm font-semibold text-text">
-                        Why Pro is managed on the web
+                        Why Plus uses web billing
                       </div>
                       <div className="mt-4 space-y-3">
                         {copy.featureBullets.map((feature) => (
@@ -138,7 +138,7 @@ export function UpgradeModal({
                           onClick={() => void onUpgrade()}
                           variant="primary"
                         >
-                          Open Web Pricing
+                          Pricing
                         </Button>
                         <div className="text-center text-xs text-muted">
                           Monthly and yearly plans continue on the Projecto

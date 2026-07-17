@@ -17,6 +17,7 @@ import type {
   Project,
   ProjectTerminalSession,
   ProjectUpdateInput,
+  RunningPort,
   RunEvent,
   SubscriptionState,
   UsageStats,
@@ -94,6 +95,7 @@ declare global {
       insights: { getUsageStats: () => Promise<UsageStats> };
       diagnostics: {
         getReport: () => Promise<DiagnosticsReport>;
+        getRunningPorts: () => Promise<RunningPort[]>;
         exportReport: () => Promise<void>;
         copyReport: () => Promise<void>;
         openAppDataFolder: () => Promise<void>;

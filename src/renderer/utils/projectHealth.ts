@@ -1,25 +1,20 @@
 import type {
   CommandSafetySummary,
-  DesktopBridgeState,
   Project,
   RunEvent,
-  AppSettings,
 } from "../../main/types/shared";
-import type { ProjectHealthStatus } from "../types/projectHealth";
 import { isProjectLockedBySubscription } from "../../billing/upgradeGate";
+import type { ProjectHealthStatus } from "../types/projectHealth";
 import { getDefaultProfile, getRunnableProfileCommands } from "./launch";
-import { isVscodeTerminalStrategy } from "./terminalSessions";
+
 export type ProjectHealthInput = {
   project: Project;
-  settings: AppSettings;
-  bridgeState: DesktopBridgeState;
   recentLaunchFailures?: RunEvent[];
   commandSafety?: CommandSafetySummary[];
 };
+
 export function getProjectHealthStatus({
   project,
-  settings,
-  bridgeState,
   recentLaunchFailures = [],
   commandSafety = [],
 }: ProjectHealthInput): ProjectHealthStatus {
@@ -29,6 +24,7 @@ export function getProjectHealthStatus({
   if (project.missingFolder) {
     return "missing-folder";
   }
+
   const defaultProfile = getDefaultProfile(project);
   if (!defaultProfile) {
     return "no-launch-profile";
@@ -36,12 +32,7 @@ export function getProjectHealthStatus({
   if (recentLaunchFailures.some((event) => event.projectId === project.id)) {
     return "command-failed";
   }
-  if (
-    isVscodeTerminalStrategy(settings.terminalStrategy) &&
-    !bridgeState.extensionConnected
-  ) {
-    return "extension-required";
-  }
+
   const runnableCommandIds = new Set(
     getRunnableProfileCommands(project, defaultProfile).map(
       (command) => command.id,
@@ -50,11 +41,14 @@ export function getProjectHealthStatus({
   const unapprovedRuntimeCommand = commandSafety.some(
     (summary) => runnableCommandIds.has(summary.commandId) && !summary.approved,
   );
+
   if (unapprovedRuntimeCommand) {
     return "approval-required";
   }
+
   return "ready";
 }
+
 export const projectHealthCopy: Record<
   ProjectHealthStatus,
   { label: string; description: string }
@@ -62,8 +56,7 @@ export const projectHealthCopy: Record<
   ready: { label: "Ready", description: "Projecto can launch this project." },
   locked: {
     label: "Locked",
-    description:
-      "This project is visible on Standard but needs Pro before it can launch.",
+    description: "This project needs Plus before it can launch.",
   },
   "missing-folder": {
     label: "Missing folder",
@@ -71,16 +64,11 @@ export const projectHealthCopy: Record<
   },
   "no-launch-profile": {
     label: "No launch profile",
-    description: "Create a launch profile before using one-click launch.",
+    description: "Create a launch profile before one-click launch.",
   },
   "approval-required": {
     label: "Approval required",
     description: "Runtime commands need first-run approval.",
-  },
-  "extension-required": {
-    label: "Extension required",
-    description:
-      "VS Code Terminal needs the Projecto extension connection.",
   },
   "sync-conflict": {
     label: "Sync attention",

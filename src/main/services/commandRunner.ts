@@ -31,16 +31,12 @@ type ExternalRunMetadata = {
   request: CommandExecutionRequest;
 };
 
+
 type ExternalRunProcess = {
   pid: number;
   startedAtFileTime: string;
 };
-
-function isOsInternalStrategy(strategy: TerminalStrategy): boolean {
-  return strategy === "os-internal";
-}
-
-function isOsExternalStrategy(strategy: TerminalStrategy): boolean {
+function isOsExternalStrategy(strategy: string): boolean {
   return strategy === "os-external";
 }
 
@@ -220,13 +216,54 @@ async function revealWindowsTerminal(
   title: string,
   runId?: string,
 ): Promise<boolean> {
+  const nativeWindowSource = [
+    "using System;",
+    "using System.Runtime.InteropServices;",
+    "using System.Text;",
+    "public static class NativeMethods {",
+    "  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);",
+    "  [DllImport(\"user32.dll\")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);",
+    "  [DllImport(\"user32.dll\")] public static extern bool IsWindowVisible(IntPtr hWnd);",
+    "  [DllImport(\"user32.dll\")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);",
+    "  [DllImport(\"user32.dll\")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);",
+    "  [DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);",
+    "}",
+  ].join("\n");
   const script = [
+    "$ErrorActionPreference = 'SilentlyContinue';",
+    `$source = '${escapePowerShellSingleQuoted(nativeWindowSource)}';`,
+    "Add-Type -TypeDefinition $source -ErrorAction SilentlyContinue;",
     "$shell = New-Object -ComObject WScript.Shell;",
-    `$activated = $shell.AppActivate("${escapePowerShellDoubleQuoted(title)}");`,
+    `$title = "${escapePowerShellDoubleQuoted(title)}";`,
+    runId
+      ? `$runId = '${escapePowerShellSingleQuoted(runId)}';`
+      : "$runId = '';",
+    "$activated = $false;",
+    "$windows = New-Object System.Collections.Generic.List[object];",
+    "[NativeMethods]::EnumWindows([NativeMethods+EnumWindowsProc]{",
+    "  param([IntPtr] $hWnd, [IntPtr] $lParam)",
+    "  if (-not [NativeMethods]::IsWindowVisible($hWnd)) { return $true }",
+    "  $builder = New-Object System.Text.StringBuilder 1024",
+    "  [void] [NativeMethods]::GetWindowText($hWnd, $builder, $builder.Capacity)",
+    "  $windowTitle = $builder.ToString()",
+    "  if ($windowTitle) {",
+    "    $windows.Add([pscustomobject] @{ Handle = $hWnd; Title = $windowTitle })",
+    "  }",
+    "  return $true",
+    "}, [IntPtr]::Zero) | Out-Null;",
+    "foreach ($window in $windows) {",
+    "  if ($window.Title -like \"*$title*\" -or ($runId -and $window.Title -like \"*$runId*\")) {",
+    "    [void] [NativeMethods]::ShowWindowAsync($window.Handle, 9)",
+    "    Start-Sleep -Milliseconds 120",
+    "    [void] [NativeMethods]::SetForegroundWindow($window.Handle)",
+    "    $activated = $true",
+    "    break",
+    "  }",
+    "}",
+    "if (-not $activated) { $activated = $shell.AppActivate($title) }",
     runId
       ? [
-          "if (-not $activated) {",
-          `  $runId = '${escapePowerShellSingleQuoted(runId)}';`,
+          "if (-not $activated -and $runId) {",
           "  $terminalProcesses = Get-CimInstance Win32_Process | Where-Object {",
           "    $_.CommandLine -and",
           "    $_.CommandLine.Contains($runId) -and",
@@ -236,10 +273,10 @@ async function revealWindowsTerminal(
           "    if ($shell.AppActivate([int] $terminalProcess.ProcessId)) { $activated = $true; break }",
           "  }",
           "}",
-        ].join(" ")
+        ].join("\n")
       : "",
     "if (-not $activated) { exit 1 }",
-  ].join(" ");
+  ].join("\n");
 
   return new Promise<boolean>((resolve) => {
     const child = spawn(
@@ -326,19 +363,18 @@ async function closeWindowsExternalTerminal(
     "    if ($LASTEXITCODE -eq 0) { $stopped = $true }",
     "  }",
     "}",
-    "if (-not $stopped) {",
-    "  $processes = @();",
-    "  try {",
-    "    $processes = Get-CimInstance Win32_Process | Where-Object {",
-    "      $_.CommandLine -and",
-    "      $_.CommandLine.Contains($runId) -and",
-    "      @('powershell.exe', 'pwsh.exe', 'cmd.exe') -contains $_.Name",
-    "    };",
-    "  } catch {}",
-    "  foreach ($process in $processes) {",
-    "    & taskkill.exe /PID $process.ProcessId /T /F | Out-Null;",
-    "    if ($LASTEXITCODE -eq 0) { $stopped = $true }",
-    "  }",
+    "$processes = @();",
+    "try {",
+    "  $processes = Get-CimInstance Win32_Process | Where-Object {",
+    "    $_.CommandLine -and",
+    "    $_.CommandLine.Contains($runId) -and",
+    "    @('powershell.exe', 'pwsh.exe', 'cmd.exe') -contains $_.Name",
+    "  };",
+    "} catch {}",
+    "foreach ($process in $processes) {",
+    "  if ($process.ProcessId -eq $trackedProcessId) { continue }",
+    "  & taskkill.exe /PID $process.ProcessId /T /F | Out-Null;",
+    "  if ($LASTEXITCODE -eq 0) { $stopped = $true }",
     "}",
     "if (-not $stopped) {",
     "  $shell = New-Object -ComObject WScript.Shell;",
@@ -373,7 +409,7 @@ async function closeWindowsExternalTerminal(
   });
 }
 
-async function closeUnixExternalTerminal(runId: string): Promise<boolean> {
+async function closeMacExternalTerminal(runId: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const child = spawn("pkill", ["-TERM", "-f", runId], {
       detached: false,
@@ -385,6 +421,17 @@ async function closeUnixExternalTerminal(runId: string): Promise<boolean> {
   });
 }
 
+async function closeLinuxExternalTerminal(runId: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn("pkill", ["-TERM", "-f", runId], {
+      detached: false,
+      stdio: "ignore",
+    });
+
+    child.once("error", () => resolve(false));
+    child.once("close", (code) => resolve(code === 0));
+  });
+}
 export class CommandRunner {
   private readonly events = new EventEmitter();
   private readonly activeChildren = new Map<string, ChildProcess>();
@@ -420,19 +467,6 @@ export class CommandRunner {
       "started",
       `Queued ${request.command.label}`,
     );
-
-    if (isOsInternalStrategy(request.terminalStrategy)) {
-      await this.runManagedExternalCommand(request, runId, resolvedCwd);
-
-      return CommandRunResultSchema.parse({
-        runId,
-        commandId: request.command.id,
-        status: "spawned",
-        executionMode: request.terminalStrategy,
-        managed: true,
-      });
-    }
-
     if (isOsExternalStrategy(request.terminalStrategy)) {
       await this.openMirroredExternalTerminal(request, runId, resolvedCwd);
 
@@ -486,9 +520,12 @@ export class CommandRunner {
     const trackedProcess = process.platform === "win32"
       ? await this.readExternalRunProcess(runId)
       : undefined;
+
     const closed = process.platform === "win32"
       ? await closeWindowsExternalTerminal(title, runId, trackedProcess)
-      : await closeUnixExternalTerminal(runId);
+      : process.platform === "darwin"
+        ? await closeMacExternalTerminal(runId)
+        : await closeLinuxExternalTerminal(runId);
 
     if (!closed) {
       return false;
@@ -502,7 +539,6 @@ export class CommandRunner {
 
     this.externalRuns.delete(runId);
     await this.removeExternalRunProcess(runId);
-
     if (metadata) {
       emitStatus(
         this.events,
@@ -550,109 +586,6 @@ export class CommandRunner {
     for (const runId of [...this.activeChildren.keys()]) {
       this.stopRun(runId);
     }
-  }
-
-  private async runManagedExternalCommand(
-    request: CommandExecutionRequest,
-    runId: string,
-    cwd: string,
-  ): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(request.command.command, {
-        cwd,
-        shell: true,
-        detached: process.platform !== "win32",
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      let spawned = false;
-
-      const emitOutput = (kind: "stdout" | "stderr", chunk: Buffer): void => {
-        this.events.emit("run-event", {
-          runId,
-          projectId: request.projectId,
-          launchId: request.launchId,
-          profileId: request.profileId,
-          commandId: request.command.id,
-          kind,
-          message: chunk.toString("utf8"),
-          timestamp: new Date().toISOString(),
-          executionMode: request.terminalStrategy,
-          managed: true,
-        } satisfies RunEvent);
-      };
-
-      child.stdout?.on("data", (chunk: Buffer) => emitOutput("stdout", chunk));
-      child.stderr?.on("data", (chunk: Buffer) => emitOutput("stderr", chunk));
-
-      child.once("error", (error) => {
-        this.activeChildren.delete(runId);
-        this.activeRequests.delete(runId);
-        this.stoppingRunIds.delete(runId);
-
-        if (!spawned) {
-          reject(error);
-          return;
-        }
-
-        emitStatus(
-          this.events,
-          request,
-          runId,
-          "failed",
-          error.message,
-          undefined,
-          true,
-        );
-      });
-
-      child.once("spawn", () => {
-        spawned = true;
-        this.activeChildren.set(runId, child);
-        this.activeRequests.set(runId, request);
-        emitStatus(
-          this.events,
-          request,
-          runId,
-          "spawned",
-          "Started in the background. Projecto is streaming output into Run Logs.",
-          undefined,
-          true,
-        );
-        resolve();
-      });
-
-      child.once("close", (code, signal) => {
-        this.activeChildren.delete(runId);
-        this.activeRequests.delete(runId);
-        const stoppedByUser = this.stoppingRunIds.delete(runId);
-        const exitCode = code ?? (stoppedByUser ? null : undefined);
-        const status: RunStatus = stoppedByUser
-          ? "stopped"
-          : code === 0
-            ? "completed"
-            : "failed";
-        const message = stoppedByUser
-          ? "Project stopped by Projecto."
-          : code === 0
-            ? "Background command completed."
-            : signal
-              ? `Background command exited after signal ${signal}.`
-              : Number.isInteger(code)
-                ? `Background command exited with code ${code}.`
-                : "Background command exited.";
-
-        emitStatus(
-          this.events,
-          request,
-          runId,
-          status,
-          message,
-          exitCode,
-          true,
-        );
-      });
-    });
   }
 
   private async openMirroredExternalTerminal(
@@ -731,9 +664,9 @@ export class CommandRunner {
         `$logPath = '${escapePowerShellSingleQuoted(logPath)}'`,
         `$processPath = '${escapePowerShellSingleQuoted(processPath)}'`,
         "$utf8NoBom = [System.Text.UTF8Encoding]::new($false)",
+        "[System.IO.File]::WriteAllText($processPath, \"$PID|$([Diagnostics.Process]::GetCurrentProcess().StartTime.ToFileTimeUtc())\", $utf8NoBom)",
         "$script:projectoExitCode = 0",
         "$script:projectoFinalized = $false",
-        "[System.IO.File]::WriteAllText($processPath, \"$PID|$([Diagnostics.Process]::GetCurrentProcess().StartTime.ToFileTimeUtc())\", $utf8NoBom)",
         "function Write-ProjectoLogLine {",
         "  param([string] $line)",
         "  [System.IO.File]::AppendAllText($logPath, $line + [Environment]::NewLine, $utf8NoBom)",

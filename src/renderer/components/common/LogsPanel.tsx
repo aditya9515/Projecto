@@ -22,6 +22,7 @@ import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
 import { cn } from "../../utils/cn";
 import { handleMappedLaunchError } from "../../utils/launchErrorHandlers";
+import { getFriendlyErrorMessage } from "../../utils/errors";
 import {
   formatTerminalControlLabel,
   formatTerminalStrategyLabel,
@@ -186,10 +187,7 @@ export function LogsPanel(): JSX.Element {
         .catch((error) => {
           pushToast({
             title: "Unable to stop project",
-            description:
-              error instanceof Error
-                ? error.message
-                : "Unknown project stop error.",
+            description: getFriendlyErrorMessage(error, "Projecto could not stop this project launch."),
             tone: "error",
           });
         });
@@ -387,10 +385,7 @@ export function LogsPanel(): JSX.Element {
                             }
                             pushToast({
                               title: "Unable to rerun",
-                              description:
-                                error instanceof Error
-                                  ? error.message
-                                  : "Unknown launch error.",
+                              description: getFriendlyErrorMessage(error, "Projecto could not rerun this launch."),
                               tone: "error",
                             });
                           }
@@ -439,10 +434,7 @@ export function LogsPanel(): JSX.Element {
                         .catch((error) => {
                           pushToast({
                             title: "Unable to export logs",
-                            description:
-                              error instanceof Error
-                                ? error.message
-                                : "Unknown log export error.",
+                            description: getFriendlyErrorMessage(error, "Projecto could not export these logs."),
                             tone: "error",
                           });
                         });
