@@ -96,6 +96,7 @@ describe("LauncherService", () => {
   const commandRunner = {
     runCommand: vi.fn(),
     stopRun: vi.fn(),
+    closeExternalRun: vi.fn(),
     revealExternalRun: vi.fn(),
     onRunEvent: vi.fn((listener: (event: unknown) => void) => {
       runEventListener = listener;
@@ -264,6 +265,7 @@ describe("LauncherService", () => {
       managed: true,
     });
     commandRunner.stopRun.mockReturnValue(true);
+    commandRunner.closeExternalRun.mockResolvedValue(false);
     terminalSessionStore.getSessions.mockResolvedValue([]);
     terminalSessionStore.upsertSession.mockImplementation((session) =>
       Promise.resolve(session),
@@ -661,6 +663,44 @@ describe("LauncherService", () => {
     expect(commandRunner.revealExternalRun).not.toHaveBeenCalled();
   });
 
+  it("closes visible OS terminal sessions through the external terminal close path", async () => {
+    const session: ProjectTerminalSession = {
+      projectId: project.id,
+      projectName: project.name,
+      projectPath: project.path,
+      launchId: "launch-1",
+      activeRunId: "run-1",
+      runIds: ["run-1"],
+      terminalStrategy: "os-external",
+      status: "ready",
+      detectedUrls: ["http://localhost:5173/"],
+      detectedPorts: [],
+      terminalTitle: "Projecto: Workspace (run-1)",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    terminalSessionStore.getSessions.mockResolvedValue([session]);
+    commandRunner.stopRun.mockReturnValue(false);
+    commandRunner.closeExternalRun.mockResolvedValue(true);
+    const launcherService = createLauncherService();
+
+    await expect(
+      launcherService.stopProjectTerminal(project.id),
+    ).resolves.toBe(true);
+    expect(commandRunner.stopRun).toHaveBeenCalledWith("run-1");
+    expect(commandRunner.closeExternalRun).toHaveBeenCalledWith(
+      "run-1",
+      session.terminalTitle,
+    );
+    expect(terminalSessionStore.updateSession).toHaveBeenCalledWith(
+      project.id,
+      expect.objectContaining({
+        status: "stopping",
+        lastMessage: "Stopping project from Projecto.",
+      }),
+    );
+    expect(commandRunner.revealExternalRun).not.toHaveBeenCalled();
+  });
   it("allows relaunch after a stale OS terminal reveal clears a ready session", async () => {
     const storedSessions = mockStoredTerminalSessions([
       {

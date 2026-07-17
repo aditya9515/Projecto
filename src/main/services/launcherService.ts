@@ -644,10 +644,23 @@ export class LauncherService {
       }
     }
 
+    if (!stopped && isVisibleOsTerminalStrategy(session.terminalStrategy)) {
+      for (const runId of runIds) {
+        if (
+          await this.commandRunner.closeExternalRun(
+            runId,
+            session.terminalTitle,
+          )
+        ) {
+          stopped = true;
+        }
+      }
+    }
+
     if (!stopped && isOsTerminalStrategy(session.terminalStrategy)) {
       await this.clearTerminalSession(projectId);
       throw new Error(
-        "Projecto could not find a managed background process for this session, so it cleared the stale launch state.",
+        "Projecto could not close the mapped OS terminal, so it cleared the stale launch state.",
       );
     }
 

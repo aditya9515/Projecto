@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -279,6 +280,72 @@ describe("CommandRunner", () => {
     }
   });
 
+  it("closes a visible Windows terminal run by run id and emits stopped status", async () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", {
+      configurable: true,
+      value: "win32",
+    });
+
+    const runsDirectory = path.join(
+      os.tmpdir(),
+      `projecto-close-external-${Date.now()}`,
+    );
+
+    try {
+      vi.mocked(spawn).mockImplementation((commandName, args) => {
+        const child = createManagedChild();
+        queueMicrotask(() => {
+          if (commandName === "powershell.exe") {
+            const script = Array.isArray(args) ? args.join(" ") : "";
+            expect(script).toContain("taskkill.exe");
+            expect(script).toContain("$runId = '");
+            child.emit("close", 0);
+          }
+        });
+        return child as never;
+      });
+
+      const runner = new CommandRunner(runsDirectory);
+      const events: unknown[] = [];
+      runner.onRunEvent((event) => events.push(event));
+
+      const result = await runner.runCommand({
+        projectId: "project-1",
+        projectName: "Example App",
+        projectPath: "D:/projects/example-app",
+        command,
+        terminalStrategy: "os-external",
+      });
+
+      await expect(runner.closeExternalRun(result.runId)).resolves.toBe(true);
+      expect(spawn).toHaveBeenCalledWith(
+        "powershell.exe",
+        expect.arrayContaining([
+          "-Command",
+          expect.stringContaining(result.runId),
+        ]),
+        expect.objectContaining({ windowsHide: true, stdio: "ignore" }),
+      );
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            runId: result.runId,
+            kind: "status",
+            status: "stopped",
+            message: "Projecto closed the mapped OS terminal.",
+            managed: false,
+          }),
+        ]),
+      );
+    } finally {
+      Object.defineProperty(process, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      await fs.rm(runsDirectory, { recursive: true, force: true });
+    }
+  });
   it("starts OS external commands in a visible terminal with mirrored output", async () => {
     const originalPlatform = process.platform;
     Object.defineProperty(process, "platform", {
