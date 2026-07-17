@@ -90,8 +90,8 @@ The desktop app checks the hosted Projecto website for update metadata. The webs
 
 Current production release:
 
-- Version: `1.0.1`
-- Installer: `Projecto-1.0.1.Setup.exe`
+- Version: `1.0.3`
+- Installer: `Projecto-1.0.3.Setup.exe`
 - Release feed: GitHub Releases
 - Windows maker: Squirrel.Windows through Electron Forge
 
