@@ -6,18 +6,18 @@ The desktop app is built with Electron, React, TypeScript, and a context-isolate
 
 ## Demo Video
 
-Add the final demo video here after recording and uploading it.
+Watch the Projecto desktop walkthrough on the hosted website:
 
-Suggested options:
+[Projecto demo video](https://projecto.adityakosuru.online/#demo)
 
-- GitHub README video upload
-- YouTube or unlisted YouTube link
-- Projecto website demo page
-- GitHub Release asset
+<a href="https://projecto.adityakosuru.online/#demo">
+  <img src="https://projecto.adityakosuru.online/demo/projecto-explanation-poster.jpg" alt="Projecto demo video preview" width="720" />
+</a>
 
-```md
-[Watch the Projecto demo](DEMO_VIDEO_URL_HERE)
-```
+Direct video file:
+
+- Hosted website: `https://projecto.adityakosuru.online/demo/projecto-explanation.mp4`
+- GitHub release asset: `https://github.com/aditya9515/Projecto/releases/download/v1.0.4/projecto_explaination.mp4`
 
 ## Highlights
 
@@ -90,8 +90,8 @@ The desktop app checks the hosted Projecto website for update metadata. The webs
 
 Current production release:
 
-- Version: `1.0.2`
-- Installer: `Projecto-1.0.2.Setup.exe`
+- Version: `1.0.4`
+- Installer: `Projecto-1.0.4.Setup.exe`
 - Release feed: GitHub Releases
 - Windows maker: Squirrel.Windows through Electron Forge
 
