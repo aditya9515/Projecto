@@ -1,7 +1,7 @@
 {
   "name": "projecto",
   "productName": "Projecto",
-  "version": "1.0.3",
+  "version": "1.0.2",
   "description": "An Electron desktop app for managing, syncing, and launching developer projects through the Projecto platform.",
   "main": ".webpack/main",
   "private": true,
