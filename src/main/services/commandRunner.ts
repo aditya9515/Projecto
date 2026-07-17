@@ -28,13 +28,18 @@ const EXTERNAL_EXIT_MARKER = "__PROJECTO_EXIT_CODE:";
 type ExternalRunMetadata = {
   projectId: string;
   title: string;
+  request: CommandExecutionRequest;
 };
 
 function isOsInternalStrategy(strategy: TerminalStrategy): boolean {
   return strategy === "os-internal";
 }
 
-function isOsExternalStrategy(strategy: TerminalStrategy): boolean {
+type ExternalRunProcess = {
+  pid: number;
+  startedAtFileTime: string;
+};
+function isOsExternalStrategy(strategy: string): boolean {
   return strategy === "os-external";
 }
 
@@ -302,6 +307,93 @@ async function revealLinuxTerminal(title: string): Promise<boolean> {
   });
 }
 
+async function closeWindowsExternalTerminal(
+  title: string,
+  runId: string,
+  trackedProcess?: ExternalRunProcess,
+): Promise<boolean> {
+  const script = [
+    `$runId = '${escapePowerShellSingleQuoted(runId)}';`,
+    `$title = "${escapePowerShellDoubleQuoted(title)}";`,
+    `$trackedProcessId = ${trackedProcess?.pid ?? "$null"};`,
+    `$trackedProcessStartedAt = '${trackedProcess?.startedAtFileTime ?? ""}';`,
+    "$stopped = $false;",
+    "if ($trackedProcessId) {",
+    "  $trackedProcess = Get-Process -Id $trackedProcessId -ErrorAction SilentlyContinue;",
+    "  if ($trackedProcess -and ([string] $trackedProcess.StartTime.ToFileTimeUtc()) -eq $trackedProcessStartedAt) {",
+    "    & taskkill.exe /PID $trackedProcessId /T /F | Out-Null;",
+    "    if ($LASTEXITCODE -eq 0) { $stopped = $true }",
+    "  }",
+    "}",
+    "$processes = @();",
+    "try {",
+    "  $processes = Get-CimInstance Win32_Process | Where-Object {",
+    "    $_.CommandLine -and",
+    "    $_.CommandLine.Contains($runId) -and",
+    "    @('powershell.exe', 'pwsh.exe', 'cmd.exe') -contains $_.Name",
+    "  };",
+    "} catch {}",
+    "foreach ($process in $processes) {",
+    "  if ($process.ProcessId -eq $trackedProcessId) { continue }",
+    "  & taskkill.exe /PID $process.ProcessId /T /F | Out-Null;",
+    "  if ($LASTEXITCODE -eq 0) { $stopped = $true }",
+    "}",
+    "if (-not $stopped) {",
+    "  $shell = New-Object -ComObject WScript.Shell;",
+    "  if ($shell.AppActivate($title)) {",
+    "    Start-Sleep -Milliseconds 150;",
+    "    $shell.SendKeys('%{F4}');",
+    "    $stopped = $true;",
+    "  }",
+    "}",
+    "if (-not $stopped) { exit 1 }",
+  ].join(" ");
+
+  return new Promise<boolean>((resolve) => {
+    const child = spawn(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        script,
+      ],
+      {
+        windowsHide: true,
+        stdio: "ignore",
+      },
+    );
+
+    child.once("error", () => resolve(false));
+    child.once("close", (code) => resolve(code === 0));
+  });
+}
+
+async function closeMacExternalTerminal(runId: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn("pkill", ["-TERM", "-f", runId], {
+      detached: false,
+      stdio: "ignore",
+    });
+
+    child.once("error", () => resolve(false));
+    child.once("close", (code) => resolve(code === 0));
+  });
+}
+
+async function closeLinuxExternalTerminal(runId: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn("pkill", ["-TERM", "-f", runId], {
+      detached: false,
+      stdio: "ignore",
+    });
+
+    child.once("error", () => resolve(false));
+    child.once("close", (code) => resolve(code === 0));
+  });
+}
 export class CommandRunner {
   private readonly events = new EventEmitter();
   private readonly activeChildren = new Map<string, ChildProcess>();
@@ -387,6 +479,54 @@ export class CommandRunner {
     }
 
     return revealLinuxTerminal(title);
+  }
+
+  async closeExternalRun(
+    runId: string,
+    fallbackTitle?: string,
+  ): Promise<boolean> {
+    const metadata = this.externalRuns.get(runId);
+    const title = metadata?.title ?? fallbackTitle;
+
+    if (!title) {
+      return false;
+    }
+
+    const trackedProcess = process.platform === "win32"
+      ? await this.readExternalRunProcess(runId)
+      : undefined;
+
+    const closed = process.platform === "win32"
+      ? await closeWindowsExternalTerminal(title, runId, trackedProcess)
+      : process.platform === "darwin"
+        ? await closeMacExternalTerminal(runId)
+        : await closeLinuxExternalTerminal(runId);
+
+    if (!closed) {
+      return false;
+    }
+
+    const tailer = this.externalTailers.get(runId);
+    if (tailer) {
+      clearInterval(tailer);
+      this.externalTailers.delete(runId);
+    }
+
+    this.externalRuns.delete(runId);
+    await this.removeExternalRunProcess(runId);
+    if (metadata) {
+      emitStatus(
+        this.events,
+        metadata.request,
+        runId,
+        "stopped",
+        "Projecto closed the mapped OS terminal.",
+        null,
+        false,
+      );
+    }
+
+    return true;
   }
 
   stopRun(runId: string): boolean {
@@ -540,6 +680,7 @@ export class CommandRunner {
     this.externalRuns.set(runId, {
       projectId: request.projectId,
       title: terminalTitle,
+      request,
     });
 
     await fs.writeFile(logPath, "", "utf8");
@@ -574,6 +715,7 @@ export class CommandRunner {
   ): Promise<void> {
     const commandPath = path.join(this.runsDirectory, `${runId}.cmd`);
     const scriptPath = path.join(this.runsDirectory, `${runId}.ps1`);
+    const processPath = this.getExternalRunProcessPath(runId);
     const safeCwd = cwd.replace(/"/g, '""');
 
     await fs.writeFile(
@@ -598,7 +740,9 @@ export class CommandRunner {
         "$OutputEncoding = [System.Text.UTF8Encoding]::new()",
         `$cmdPath = '${escapePowerShellSingleQuoted(commandPath)}'`,
         `$logPath = '${escapePowerShellSingleQuoted(logPath)}'`,
+        `$processPath = '${escapePowerShellSingleQuoted(processPath)}'`,
         "$utf8NoBom = [System.Text.UTF8Encoding]::new($false)",
+        "[System.IO.File]::WriteAllText($processPath, \"$PID|$([Diagnostics.Process]::GetCurrentProcess().StartTime.ToFileTimeUtc())\", $utf8NoBom)",
         "$script:projectoExitCode = 0",
         "$script:projectoFinalized = $false",
         "function Write-ProjectoLogLine {",
@@ -625,6 +769,7 @@ export class CommandRunner {
         "  Write-Error $_",
         "} finally {",
         "  Write-ProjectoFinalStatus",
+        "  Remove-Item -LiteralPath $processPath -Force -ErrorAction SilentlyContinue",
         "}",
         "exit $script:projectoExitCode",
         "",
@@ -683,6 +828,44 @@ export class CommandRunner {
     }
 
     await openLinuxMirroredExternalTerminal(scriptPath);
+  }
+
+  private getExternalRunProcessPath(runId: string): string {
+    return path.join(this.runsDirectory, `${runId}.process`);
+  }
+
+  private async readExternalRunProcess(
+    runId: string,
+  ): Promise<ExternalRunProcess | undefined> {
+    try {
+      const [pidText, startedAtFileTime] = (
+        await fs.readFile(this.getExternalRunProcessPath(runId), "utf8")
+      )
+        .trim()
+        .split("|", 2);
+      const pid = Number(pidText);
+
+      if (
+        !Number.isSafeInteger(pid) ||
+        pid <= 0 ||
+        !startedAtFileTime ||
+        !/^\d+$/.test(startedAtFileTime)
+      ) {
+        return undefined;
+      }
+
+      return { pid, startedAtFileTime };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async removeExternalRunProcess(runId: string): Promise<void> {
+    try {
+      await fs.rm(this.getExternalRunProcessPath(runId), { force: true });
+    } catch {
+      // The terminal process may have already removed its own tracking file.
+    }
   }
 
   private startExternalLogTail(
