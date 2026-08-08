@@ -32,7 +32,7 @@ export function ToastRegion(): JSX.Element {
           >
             <motion.div
               animate={{ x: 0, scale: 1 }}
-              className={`relative mb-3 overflow-hidden rounded-2xl border px-4 py-3 ${toneStyles[toast.tone]}`}
+              className={`relative mb-3 overflow-hidden rounded-[0.3rem] border px-4 py-3 ${toneStyles[toast.tone]}`}
               exit={{ x: 18, scale: 0.98 }}
               initial={{ x: 18, scale: 0.98 }}
               transition={{ duration: 0.18 }}
@@ -40,7 +40,7 @@ export function ToastRegion(): JSX.Element {
               <div className="flex w-[360px] items-start gap-3">
                 <div className="mt-0.5">{toneIcons[toast.tone]}</div>
                 <div className="space-y-1">
-                  <Toast.Title className="text-sm font-semibold">
+                  <Toast.Title className="text-[0.68rem] font-bold uppercase tracking-[0.12em]">
                     {toast.title}
                   </Toast.Title>
                   {toast.description ? (

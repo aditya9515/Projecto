@@ -15,10 +15,10 @@ export function PageHeader({
       {" "}
       <div>
         {" "}
-        <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
+        <div className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
           {eyebrow}
         </div>{" "}
-        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-text">
+        <h2 className="app-page-title mt-2 text-text">
           {title}
         </h2>{" "}
         {description ? (

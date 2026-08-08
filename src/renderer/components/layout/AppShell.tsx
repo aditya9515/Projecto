@@ -65,16 +65,16 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
         <AnimatedSidebar />{" "}
         <div className="flex min-w-0 flex-1 flex-col">
           {" "}
-          <header className="border-b border-line px-6 py-5 lg:px-8 lg:py-6">
+          <header className="app-topbar border-b border-line px-5 py-5 lg:px-10 lg:py-8">
             {" "}
             <div className="mx-auto flex w-full max-w-[1560px] items-end justify-between gap-4">
               {" "}
               <div>
                 {" "}
-                <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
+                <div className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
                   Projecto
                 </div>{" "}
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-text">
+                <h1 className="app-page-title mt-2 text-text">
                   {page.title}
                 </h1>{" "}
                 <p className="mt-2 text-sm leading-6 text-muted">
@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
               </div>{" "}
             </div>{" "}
           </header>{" "}
-          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-6 lg:px-8 lg:py-8">
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-10 lg:pb-20 lg:pt-8">
             {" "}
             <div className="mx-auto w-full max-w-[1560px] space-y-6">
               {" "}

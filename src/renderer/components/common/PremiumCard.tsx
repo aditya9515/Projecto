@@ -9,7 +9,7 @@ export function PremiumCard({
   return (
     <motion.div
       className={cn(
-        "app-card-surface rounded-[28px] border border-line ",
+        "app-card-surface rounded-[0.3rem] border border-line ",
         className,
       )}
       layout

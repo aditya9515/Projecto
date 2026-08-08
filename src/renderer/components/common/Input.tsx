@@ -7,7 +7,7 @@ export function Input(
     <input
       {...props}
       className={cn(
-        "h-11 w-full rounded-xl border border-line bg-panel px-3.5 text-sm text-text outline-none transition duration-150 ease-premium placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent",
+        "h-10 w-full rounded-xl border border-line bg-panel px-3.5 text-sm text-text outline-none transition duration-150 ease-premium placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg",
         props.className,
       )}
     />
@@ -20,7 +20,7 @@ export function Textarea(
     <textarea
       {...props}
       className={cn(
-        "min-h-[120px] w-full rounded-xl border border-line bg-panel px-3.5 py-3 text-sm text-text outline-none transition duration-150 ease-premium placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent",
+        "min-h-[120px] w-full rounded-xl border border-line bg-panel px-3.5 py-3 text-sm text-text outline-none transition duration-150 ease-premium placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg",
         props.className,
       )}
     />

@@ -25,7 +25,7 @@ export function PlanBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] app-status-success",
+        "inline-flex items-center gap-2 rounded-lg border px-3 py-1 text-[0.62rem] font-bold uppercase tracking-[0.16em] app-status-success",
         className,
       )}
     >

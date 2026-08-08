@@ -205,18 +205,18 @@ function OfflineGate({
   onRetry: () => Promise<void>;
 }): JSX.Element {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-6">
+    <div className="app-shell-surface flex min-h-screen items-center justify-center bg-bg px-6">
       {" "}
-      <div className="w-full max-w-xl rounded-[28px] border border-line bg-bg p-8">
+      <div className="app-card-surface w-full max-w-xl rounded-[0.3rem] border border-line bg-panel p-8">
         {" "}
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-shell text-text">
+        <div className="app-icon-surface flex h-12 w-12 items-center justify-center rounded-[0.3rem] text-text">
           {" "}
           <WifiOff className="h-5 w-5" />{" "}
         </div>{" "}
-        <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-muted">
+        <div className="mt-5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
           No Network
         </div>{" "}
-        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-text">
+        <h2 className="app-page-title mt-2 text-text">
           Connect again to continue using Projecto.
         </h2>{" "}
         <p className="mt-3 text-sm leading-6 text-muted">
@@ -238,14 +238,14 @@ function OfflineGate({
 }
 function ProjectoUnavailable(): JSX.Element {
   return (
-    <div className="flex h-screen items-center justify-center px-6">
+    <div className="app-shell-surface flex h-screen items-center justify-center px-6">
       {" "}
-      <div className="max-w-xl rounded-[28px] border border-line bg-panel p-8">
+      <div className="app-card-surface max-w-xl rounded-[0.3rem] border border-line bg-panel p-8">
         {" "}
-        <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
+        <div className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
           Projecto Desktop
         </div>{" "}
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-text">
+        <h1 className="app-page-title mt-3 text-text">
           Projecto needs the desktop runtime to continue.
         </h1>{" "}
         <p className="mt-4 text-sm leading-6 text-muted">

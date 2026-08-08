@@ -72,7 +72,7 @@ export function UpdateButton({
     <button
       aria-label={getUpdateButtonLabel(updateState.status)}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-bg px-3 text-sm font-semibold text-text transition hover:bg-shell disabled:cursor-wait",
+        "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-line bg-bg px-3 text-[0.66rem] font-bold uppercase tracking-[0.09em] text-text transition hover:bg-shell disabled:cursor-wait",
         collapsed ? "w-10 px-0" : "min-w-10",
       )}
       disabled={isBusy}

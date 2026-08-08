@@ -570,6 +570,7 @@ export class LauncherService {
     }
 
     let stopped = false;
+    let closedExternalTerminal = false;
 
     for (const runId of runIds) {
       if (this.stopRun(runId)) {
@@ -586,15 +587,21 @@ export class LauncherService {
           )
         ) {
           stopped = true;
+          closedExternalTerminal = true;
         }
       }
     }
 
-    if (!stopped && isOsTerminalStrategy(session.terminalStrategy)) {
+    if (closedExternalTerminal) {
       await this.clearTerminalSession(projectId);
-      throw new Error(
-        "Projecto could not close the mapped OS terminal, so it cleared the stale launch state.",
-      );
+    }
+
+    if (!stopped && isOsTerminalStrategy(session.terminalStrategy)) {
+      for (const runId of runIds) {
+        await this.commandRunner.clearExternalRunState(runId);
+      }
+      await this.clearTerminalSession(projectId);
+      return true;
     }
 
     return stopped;

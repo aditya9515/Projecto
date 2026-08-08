@@ -252,4 +252,50 @@ describe("CommandRunner", () => {
       });
     }
   });
+
+  it("cleans a stale persisted Windows Terminal marker after the terminal is already gone", async () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", {
+      configurable: true,
+      value: "win32",
+    });
+
+    try {
+      const runsDirectory = path.join(
+        os.tmpdir(),
+        `projecto-command-runner-stale-test-${Date.now()}`,
+      );
+      const runId = "stale-run";
+      await fs.mkdir(runsDirectory, { recursive: true });
+      await fs.writeFile(
+        path.join(runsDirectory, `${runId}.process`),
+        "37456|134287835804329734",
+        "utf8",
+      );
+      vi.mocked(spawn).mockImplementation((commandName, args) => {
+        const child = createChild();
+        queueMicrotask(() => {
+          if (commandName === "powershell.exe") {
+            const script = Array.isArray(args) ? args.join(" ") : "";
+            expect(script).toContain("$trackedProcessWasStale");
+            child.emit("close", 2);
+          }
+        });
+        return child as never;
+      });
+      const runner = new CommandRunner(runsDirectory);
+
+      await expect(
+        runner.closeExternalRun(runId, "Projecto: Example App (stale)"),
+      ).resolves.toBe(true);
+      await expect(
+        fs.access(path.join(runsDirectory, `${runId}.process`)),
+      ).rejects.toThrow();
+    } finally {
+      Object.defineProperty(process, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
+  });
 });

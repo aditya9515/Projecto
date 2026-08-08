@@ -15,17 +15,17 @@ export function EmptyState({
   icon,
 }: EmptyStateProps): JSX.Element {
   return (
-    <div className="rounded-[28px] border border-line bg-panel p-10">
+    <div className="rounded-[0.3rem] border border-line bg-panel p-10">
       {" "}
       <div className="mx-auto flex max-w-xl flex-col items-center gap-4 text-center">
         {" "}
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-shell text-text">
+        <div className="flex h-14 w-14 items-center justify-center rounded-[0.3rem] bg-shell text-text">
           {" "}
           {icon}{" "}
         </div>{" "}
         <div className="space-y-2">
           {" "}
-          <h2 className="text-2xl font-semibold tracking-tight text-text">
+          <h2 className="app-section-title text-3xl text-text">
             {title}
           </h2>{" "}
           <p className="text-sm leading-6 text-muted">{description}</p>{" "}

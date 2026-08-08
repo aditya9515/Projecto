@@ -24,10 +24,11 @@ module.exports = {
         danger: 'rgb(var(--danger))',
       },
       transitionTimingFunction: {
-        premium: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+        premium: 'cubic-bezier(0.2, 0.78, 0.2, 1)',
       },
       fontFamily: {
-        sans: ['"Manrope Variable"', 'ui-sans-serif', 'sans-serif'],
+        sans: ['"Manrope Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        editorial: ['Georgia', 'serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
     },

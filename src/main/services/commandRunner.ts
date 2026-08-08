@@ -36,6 +36,8 @@ type ExternalRunProcess = {
   pid: number;
   startedAtFileTime: string;
 };
+
+type WindowsExternalCloseStatus = "closed" | "stale" | "failed";
 function isOsExternalStrategy(strategy: string): boolean {
   return strategy === "os-external";
 }
@@ -349,18 +351,30 @@ async function closeWindowsExternalTerminal(
   title: string,
   runId: string,
   trackedProcess?: ExternalRunProcess,
-): Promise<boolean> {
+): Promise<WindowsExternalCloseStatus> {
   const script = [
     `$runId = '${escapePowerShellSingleQuoted(runId)}';`,
     `$title = "${escapePowerShellDoubleQuoted(title)}";`,
     `$trackedProcessId = ${trackedProcess?.pid ?? "$null"};`,
     `$trackedProcessStartedAt = '${trackedProcess?.startedAtFileTime ?? ""}';`,
     "$stopped = $false;",
+    "$trackedProcessMatched = $false;",
+    "$trackedProcessWasStale = $false;",
+    "$matchedRunProcess = $false;",
     "if ($trackedProcessId) {",
     "  $trackedProcess = Get-Process -Id $trackedProcessId -ErrorAction SilentlyContinue;",
-    "  if ($trackedProcess -and ([string] $trackedProcess.StartTime.ToFileTimeUtc()) -eq $trackedProcessStartedAt) {",
-    "    & taskkill.exe /PID $trackedProcessId /T /F | Out-Null;",
-    "    if ($LASTEXITCODE -eq 0) { $stopped = $true }",
+    "  if ($trackedProcess) {",
+    "    $actualStartedAt = '';",
+    "    try { $actualStartedAt = [string] $trackedProcess.StartTime.ToFileTimeUtc() } catch {}",
+    "    if ($actualStartedAt -eq $trackedProcessStartedAt) {",
+    "      $trackedProcessMatched = $true;",
+    "      & taskkill.exe /PID $trackedProcessId /T /F | Out-Null;",
+    "      if ($LASTEXITCODE -eq 0) { $stopped = $true }",
+    "    } else {",
+    "      $trackedProcessWasStale = $true;",
+    "    }",
+    "  } else {",
+    "    $trackedProcessWasStale = $true;",
     "  }",
     "}",
     "$processes = @();",
@@ -373,6 +387,7 @@ async function closeWindowsExternalTerminal(
     "} catch {}",
     "foreach ($process in $processes) {",
     "  if ($process.ProcessId -eq $trackedProcessId) { continue }",
+    "  $matchedRunProcess = $true;",
     "  & taskkill.exe /PID $process.ProcessId /T /F | Out-Null;",
     "  if ($LASTEXITCODE -eq 0) { $stopped = $true }",
     "}",
@@ -384,10 +399,11 @@ async function closeWindowsExternalTerminal(
     "    $stopped = $true;",
     "  }",
     "}",
+    "if (-not $stopped -and ($trackedProcessWasStale -or (-not $trackedProcessMatched -and -not $matchedRunProcess))) { exit 2 }",
     "if (-not $stopped) { exit 1 }",
   ].join(" ");
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<WindowsExternalCloseStatus>((resolve) => {
     const child = spawn(
       "powershell.exe",
       [
@@ -404,11 +420,22 @@ async function closeWindowsExternalTerminal(
       },
     );
 
-    child.once("error", () => resolve(false));
-    child.once("close", (code) => resolve(code === 0));
+    child.once("error", () => resolve("failed"));
+    child.once("close", (code) => {
+      if (code === 0) {
+        resolve("closed");
+        return;
+      }
+
+      if (code === 2) {
+        resolve("stale");
+        return;
+      }
+
+      resolve("failed");
+    });
   });
 }
-
 async function closeMacExternalTerminal(runId: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const child = spawn("pkill", ["-TERM", "-f", runId], {
@@ -521,31 +548,28 @@ export class CommandRunner {
       ? await this.readExternalRunProcess(runId)
       : undefined;
 
-    const closed = process.platform === "win32"
-      ? await closeWindowsExternalTerminal(title, runId, trackedProcess)
-      : process.platform === "darwin"
-        ? await closeMacExternalTerminal(runId)
-        : await closeLinuxExternalTerminal(runId);
+    const closeStatus: "closed" | "stale" | "failed" =
+      process.platform === "win32"
+        ? await closeWindowsExternalTerminal(title, runId, trackedProcess)
+        : (process.platform === "darwin"
+            ? await closeMacExternalTerminal(runId)
+            : await closeLinuxExternalTerminal(runId))
+          ? "closed"
+          : "failed";
 
-    if (!closed) {
+    if (closeStatus === "failed") {
       return false;
     }
-
-    const tailer = this.externalTailers.get(runId);
-    if (tailer) {
-      clearInterval(tailer);
-      this.externalTailers.delete(runId);
-    }
-
-    this.externalRuns.delete(runId);
-    await this.removeExternalRunProcess(runId);
+    await this.clearExternalRunState(runId);
     if (metadata) {
       emitStatus(
         this.events,
         metadata.request,
         runId,
         "stopped",
-        "Projecto closed the mapped OS terminal.",
+        closeStatus === "stale"
+          ? "Projecto cleared stale mapped terminal state."
+          : "Projecto closed the mapped OS terminal.",
         null,
         false,
       );
@@ -554,6 +578,16 @@ export class CommandRunner {
     return true;
   }
 
+  async clearExternalRunState(runId: string): Promise<void> {
+    const tailer = this.externalTailers.get(runId);
+    if (tailer) {
+      clearInterval(tailer);
+      this.externalTailers.delete(runId);
+    }
+
+    this.externalRuns.delete(runId);
+    await this.removeExternalRunProcess(runId);
+  }
   stopRun(runId: string): boolean {
     const child = this.activeChildren.get(runId);
     const request = this.activeRequests.get(runId);
