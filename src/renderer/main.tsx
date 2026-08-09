@@ -1,4 +1,4 @@
-import "@fontsource-variable/manrope";
+import "@fontsource-variable/inter-tight";
 import "@fontsource/jetbrains-mono";
 import "./styles/index.css";
 import ReactDOM from "react-dom/client";

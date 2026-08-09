@@ -9,6 +9,7 @@ import { PlanBadge } from "../common/PlanBadge";
 import { SubscriptionBanner } from "../common/SubscriptionBanner";
 import { UpdateOverlay } from "../common/UpdateOverlay";
 import { AnimatedSidebar } from "./AnimatedSidebar";
+import { MaskReveal } from "../motion/MaskReveal";
 const pageTitles: Record<string, { title: string; description: string }> = {
   "/": {
     title: "Dashboard",
@@ -65,23 +66,25 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
         <AnimatedSidebar />{" "}
         <div className="flex min-w-0 flex-1 flex-col">
           {" "}
-          <header className="app-topbar border-b border-line px-5 py-5 lg:px-10 lg:py-8">
+          <header className="app-topbar projecto-topbar border-b border-line px-5 py-5 lg:px-10 lg:py-6">
             {" "}
-            <div className="mx-auto flex w-full max-w-[1560px] items-end justify-between gap-4">
+            <div className="projecto-topbar-inner mx-auto flex w-full max-w-[1560px] items-end justify-between gap-4">
               {" "}
-              <div>
+              <div className="min-w-0">
                 {" "}
-                <div className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
-                  Projecto
+                <div className="projecto-micro-label text-muted">
+                  Projecto / {page.title}
                 </div>{" "}
-                <h1 className="app-page-title mt-2 text-text">
-                  {page.title}
-                </h1>{" "}
+                <MaskReveal>
+                  <h1 className="app-page-title mt-2 text-text">
+                    {page.title}
+                  </h1>
+                </MaskReveal>{" "}
                 <p className="mt-2 text-sm leading-6 text-muted">
                   {page.description}
                 </p>{" "}
               </div>{" "}
-              <div className="flex items-center gap-3">
+              <div className="projecto-topbar-actions flex items-center gap-3">
                 {" "}
                 <PlanBadge
                   plan={subscription.plan}
@@ -97,7 +100,10 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
               </div>{" "}
             </div>{" "}
           </header>{" "}
-          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-10 lg:pb-20 lg:pt-8">
+          <main
+            className="projecto-scroll-container min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-10 lg:pb-20 lg:pt-8"
+            data-route={location.pathname}
+          >
             {" "}
             <div className="mx-auto w-full max-w-[1560px] space-y-6">
               {" "}

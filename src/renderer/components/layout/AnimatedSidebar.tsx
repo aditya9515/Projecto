@@ -37,11 +37,11 @@ function BrandBlock({ collapsed }: { collapsed: boolean }): JSX.Element {
             transition={{ duration: 0.18 }}
           >
             {" "}
-            <div className="truncate text-lg font-semibold tracking-tight text-text">
+            <div className="projecto-sidebar-brand truncate text-xl font-semibold tracking-[-0.035em] text-text">
               Projecto
             </div>
-            <div className="mt-1 font-mono text-[0.62rem] font-semibold uppercase leading-4 tracking-[0.2em] text-muted">
-              Workspace Control
+            <div className="projecto-sidebar-brand mt-1 font-mono text-[0.62rem] font-semibold uppercase leading-4 tracking-[0.2em] text-muted">
+              Local workspace / 01
             </div>
           </motion.div>
         ) : null}{" "}
@@ -60,7 +60,7 @@ export function AnimatedSidebar(): JSX.Element {
   return (
     <motion.aside
       animate={{ width: collapsed ? 88 : 264 }}
-      className="app-sidebar-surface flex h-full min-h-0 shrink-0 flex-col border-r border-line px-4 py-5 "
+      className="app-sidebar-surface projecto-sidebar flex h-full min-h-0 shrink-0 flex-col border-r border-line px-4 py-5 "
       initial={false}
       transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
     >
@@ -73,9 +73,12 @@ export function AnimatedSidebar(): JSX.Element {
           {" "}
           {!collapsed ? <BrandBlock collapsed={false} /> : null}{" "}
           <div className="flex items-center gap-2">
-            <UpdateButton collapsed={collapsed} />{" "}
+            <div className="projecto-sidebar-update">
+              <UpdateButton collapsed={collapsed} />
+            </div>{" "}
             <button
-              className="rounded-lg border border-line bg-bg p-2 text-text transition hover:bg-shell"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="projecto-sidebar-toggle rounded-lg border border-line bg-bg p-2 text-text transition hover:bg-shell"
               onClick={toggleSidebar}
               type="button"
             >
@@ -100,7 +103,8 @@ export function AnimatedSidebar(): JSX.Element {
                 location.pathname.startsWith(`${item.to}/`);
           return (
             <NavLink
-              className={`relative flex items-center ${collapsed ? "justify-center px-0" : "gap-3 px-3"} overflow-hidden rounded-xl py-3 text-[0.68rem] font-bold uppercase tracking-[0.09em] transition duration-150 ease-premium ${isActive ? "text-text" : "text-muted hover:text-text"}`}
+              aria-label={item.label}
+              className={`projecto-sidebar-link relative flex items-center ${collapsed ? "justify-center px-0" : "gap-3 px-3"} overflow-hidden rounded-[2px] py-3 text-[0.68rem] font-bold uppercase tracking-[0.09em] transition duration-150 ease-premium ${isActive ? "is-active text-text" : "text-muted hover:text-text"}`}
               end={item.to === "/"}
               key={item.to}
               to={item.to}
@@ -108,7 +112,7 @@ export function AnimatedSidebar(): JSX.Element {
               {" "}
               {isActive ? (
                 <motion.span
-                  className="absolute inset-0 rounded-2xl bg-bg ring-1 ring-inset ring-line"
+                  className="projecto-nav-active absolute inset-0 rounded-[2px] ring-1 ring-inset ring-line"
                   layoutId="sidebar-active-indicator"
                   transition={{
                     type: "spring",
@@ -129,7 +133,7 @@ export function AnimatedSidebar(): JSX.Element {
                 {!collapsed ? (
                   <motion.span
                     animate={{ x: 0 }}
-                    className="relative z-10 whitespace-nowrap"
+                    className="projecto-sidebar-label relative z-10 whitespace-nowrap"
                     exit={{ x: -6 }}
                     initial={{ x: -6 }}
                     transition={{ duration: 0.16 }}
@@ -146,10 +150,13 @@ export function AnimatedSidebar(): JSX.Element {
       <div className="mt-auto space-y-3">
         {" "}
         {subscription.email ? (
-          <AccountIdentity compact={collapsed} subscription={subscription} />
+          <div className="projecto-sidebar-account">
+            <AccountIdentity compact={collapsed} subscription={subscription} />
+          </div>
         ) : null}{" "}
         <motion.button
-          className={`flex w-full items-center rounded-xl border border-line bg-bg py-3 text-left text-[0.68rem] font-bold uppercase tracking-[0.09em] text-text transition hover:bg-shell ${collapsed ? "justify-center px-0" : "gap-3 px-3"}`}
+          aria-label="Open command palette"
+          className={`projecto-sidebar-command flex w-full items-center rounded-xl border border-line bg-bg py-3 text-left text-[0.68rem] font-bold uppercase tracking-[0.09em] text-text transition hover:bg-shell ${collapsed ? "justify-center px-0" : "gap-3 px-3"}`}
           onClick={() => setCommandPaletteOpen(true)}
           type="button"
           whileHover={{ y: -1 }}
@@ -161,7 +168,7 @@ export function AnimatedSidebar(): JSX.Element {
             {!collapsed ? (
               <motion.span
                 animate={{ x: 0 }}
-                className="flex flex-1 items-center justify-between gap-3"
+                className="projecto-sidebar-command-copy flex flex-1 items-center justify-between gap-3"
                 exit={{ x: -6 }}
                 initial={{ x: -6 }}
                 transition={{ duration: 0.16 }}

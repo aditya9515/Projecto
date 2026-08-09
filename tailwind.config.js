@@ -4,9 +4,9 @@ module.exports = {
   theme: {
     extend: {
       borderRadius: {
-        lg: '1rem',
-        xl: '1.25rem',
-        '2xl': '1.5rem',
+        lg: '2px',
+        xl: '4px',
+        '2xl': '8px',
       },
       boxShadow: {
         soft: 'var(--shadow-soft)',
@@ -27,8 +27,8 @@ module.exports = {
         premium: 'cubic-bezier(0.2, 0.78, 0.2, 1)',
       },
       fontFamily: {
-        sans: ['"Manrope Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        editorial: ['Georgia', 'serif'],
+        sans: ['"Inter Tight Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        editorial: ['"Inter Tight Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
     },

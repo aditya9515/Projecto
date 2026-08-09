@@ -88,14 +88,15 @@ Projecto never kills unknown external processes that happen to use a port. It on
 
 The desktop app checks the hosted Projecto website for update metadata. The website returns the latest supported Windows installer version, file name, SHA-256 hash, setup URL, and Squirrel feed URL.
 
-Current production release:
+Current desktop build target:
 
-- Version: `1.0.4`
-- Installer: `Projecto-1.0.4.Setup.exe`
+- Version: `1.0.6`
+- Installer: `Projecto-1.0.6.Setup.exe`
 - Release feed: GitHub Releases
 - Windows maker: Squirrel.Windows through Electron Forge
 
-The download page and update API are maintained in `D:\projecto_frontend`.
+The download page and update API are maintained in `D:\projecto_frontend` and
+must be updated when the `1.0.6` artifacts are published.
 
 ## Setup
 

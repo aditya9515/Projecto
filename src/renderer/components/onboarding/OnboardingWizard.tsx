@@ -13,6 +13,7 @@ import { useState } from "react";
 import { AppIcon } from "../common/AppIcon";
 import { Button } from "../common/Button";
 import { PricingToggle } from "../common/PricingToggle";
+import { RollingTitle } from "../motion/RollingTitle";
 type OnboardingWizardProps = {
   open: boolean;
   projectCount: number;
@@ -102,9 +103,11 @@ export function OnboardingWizard({
                       <div className="mt-6 text-[11px] uppercase tracking-[0.18em] text-muted">
                         First launch
                       </div>
-                      <div className="mt-3 text-3xl font-semibold tracking-tight text-text">
-                        {currentStep.title}
-                      </div>
+                      <RollingTitle
+                        as="h2"
+                        className="projecto-onboarding-title mt-3 text-text"
+                        text={currentStep.title}
+                      />
                       <div className="mt-3 text-sm leading-6 text-muted">
                         {currentStep.description}
                       </div>
