@@ -3,7 +3,8 @@ import path from "node:path";
 import { app, BrowserWindow, shell } from "electron";
 
 function getWindowIconPath(): string {
-  return path.join(app.getAppPath(), "assets", "icon.ico");
+  const extension = process.platform === "win32" ? "ico" : "png";
+  return path.join(app.getAppPath(), "assets", `icon.${extension}`);
 }
 
 export function createMainWindow(): BrowserWindow {
