@@ -2,13 +2,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, session } from "electron";
 import squirrelStartup from "electron-squirrel-startup";
 
 import { registerBillingIpc } from "./ipc/billing.ipc";
 import { registerDiagnosticsIpc } from "./ipc/diagnostics.ipc";
 import { registerInsightsIpc } from "./ipc/insights.ipc";
 import { registerLauncherIpc } from "./ipc/launcher.ipc";
+import { registerMaintenanceIpc } from "./ipc/maintenance.ipc";
 import { registerProjectIpc } from "./ipc/project.ipc";
 import { registerSettingsIpc } from "./ipc/settings.ipc";
 import { registerUpdatesIpc } from "./ipc/updates.ipc";
@@ -21,6 +22,7 @@ import { EditorService } from "./services/editorService";
 import { ExternalUrlService } from "./services/externalUrlService";
 import { FileSystemService } from "./services/fileSystemService";
 import { LauncherService } from "./services/launcherService";
+import { MaintenanceService } from "./services/maintenanceService";
 import { ProjectDetector } from "./services/projectDetector";
 import { ProjectScanner } from "./services/projectScanner";
 import { ProjectStore } from "./services/projectStore";
@@ -263,6 +265,17 @@ async function bootstrapIpc(
 ): Promise<LauncherService> {
   const userDataPath = app.getPath("userData");
   const fileSystemService = new FileSystemService();
+  const maintenanceService = new MaintenanceService({
+    userDataPath,
+    sessionDataPath: app.getPath("sessionData"),
+    appVersion: app.getVersion(),
+    fileSystemService,
+    clearCache: () => session.defaultSession.clearCache(),
+    clearCodeCaches: () => session.defaultSession.clearCodeCaches({}),
+  });
+  await maintenanceService
+    .runAutomaticCleanupIfNeeded()
+    .catch((error) => logMainProcessError("Automatic cleanup failed", error));
   const projectDetector = new ProjectDetector();
   const projectScanner = new ProjectScanner(fileSystemService, projectDetector);
   const subscriptionStore = new SubscriptionStore(
@@ -351,6 +364,7 @@ async function bootstrapIpc(
     projectStore,
   });
   registerUpdatesIpc(updateService);
+  registerMaintenanceIpc(maintenanceService);
 
   return launcherService;
 }
