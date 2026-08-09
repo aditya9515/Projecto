@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { Activity, WifiOff } from "lucide-react";
 import {
   Navigate,
@@ -27,11 +26,17 @@ import { useSettingsStore } from "./store/useSettingsStore";
 import { useSubscriptionStore } from "./store/useSubscriptionStore";
 import { useToastStore } from "./store/useToastStore";
 import { getFriendlyErrorMessage } from "./utils/errors";
+import { MotionProvider } from "./motion/MotionProvider";
+import { RouteTransition } from "./motion/RouteTransition";
 export default function App(): JSX.Element {
-  return typeof window.launchStack !== "undefined" ? (
-    <AppContent />
-  ) : (
-    <ProjectoUnavailable />
+  return (
+    <MotionProvider>
+      {typeof window.launchStack !== "undefined" ? (
+        <AppContent />
+      ) : (
+        <ProjectoUnavailable />
+      )}
+    </MotionProvider>
   );
 }
 function AppContent(): JSX.Element {
@@ -101,15 +106,7 @@ function AppContent(): JSX.Element {
     <>
       <AppShell>
         {" "}
-        <AnimatePresence mode="wait">
-          {" "}
-          <motion.div
-            animate={{ y: 0 }}
-            exit={{ y: 10 }}
-            initial={{ y: 14 }}
-            key={location.pathname}
-            transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-          >
+        <RouteTransition key={location.pathname}>
             {" "}
             <RouteErrorBoundary>
               {" "}
@@ -126,8 +123,7 @@ function AppContent(): JSX.Element {
                 <Route element={<Navigate replace to="/" />} path="*" />{" "}
               </Routes>{" "}
             </RouteErrorBoundary>{" "}
-          </motion.div>{" "}
-        </AnimatePresence>{" "}
+        </RouteTransition>{" "}
       </AppShell>{" "}
       <CommandPalette />{" "}
       <UpgradeModal

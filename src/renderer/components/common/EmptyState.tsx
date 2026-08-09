@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button";
+import { RollingTitle } from "../motion/RollingTitle";
 type EmptyStateProps = {
   title: string;
   description: string;
@@ -25,9 +26,10 @@ export function EmptyState({
         </div>{" "}
         <div className="space-y-2">
           {" "}
-          <h2 className="app-section-title text-3xl text-text">
-            {title}
-          </h2>{" "}
+          <RollingTitle
+            className="app-section-title text-3xl text-text"
+            text={title}
+          />{" "}
           <p className="text-sm leading-6 text-muted">{description}</p>{" "}
         </div>{" "}
         {actionLabel && onAction ? (

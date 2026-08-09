@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MaskReveal } from "../motion/MaskReveal";
 export function PageHeader({
   eyebrow = "Projecto",
   title,
@@ -15,12 +16,14 @@ export function PageHeader({
       {" "}
       <div>
         {" "}
-        <div className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
+        <div className="projecto-micro-label text-muted">
           {eyebrow}
         </div>{" "}
-        <h2 className="app-page-title mt-2 text-text">
-          {title}
-        </h2>{" "}
+        <MaskReveal>
+          <h2 className="app-page-title mt-2 text-text">
+            {title}
+          </h2>
+        </MaskReveal>{" "}
         {description ? (
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
             {description}

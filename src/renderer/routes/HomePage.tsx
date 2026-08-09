@@ -19,6 +19,8 @@ import { SkeletonCard } from "../components/common/SkeletonCard";
 import { AccountIdentity } from "../components/common/AccountIdentity";
 import { AnimatedProjectCard } from "../components/project/AnimatedProjectCard";
 import { StatusPill } from "../components/common/StatusPill";
+import { WorkspaceHero } from "../components/dashboard/WorkspaceHero";
+import { SectionReveal } from "../components/motion/SectionReveal";
 import { useAppStatusStore } from "../store/useAppStatusStore";
 import { useInsightsStore } from "../store/useInsightsStore";
 import { useLogsStore } from "../store/useLogsStore";
@@ -269,6 +271,15 @@ export function HomePage(): JSX.Element {
   return (
     <div className="space-y-8">
       {" "}
+      <SectionReveal>
+        <WorkspaceHero
+          activeRunCount={activeRunCount}
+          onAddProject={() => navigate("/import")}
+          onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+          online={online}
+          projectCount={projects.length}
+        />
+      </SectionReveal>{" "}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         {" "}
         <Input

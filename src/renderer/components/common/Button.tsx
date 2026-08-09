@@ -1,12 +1,12 @@
-import type { HTMLMotionProps } from "framer-motion";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "../../utils/cn";
-import { MotionButton } from "./MotionButton";
+import { RollingText } from "../motion/RollingText";
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-type ButtonProps = Omit<HTMLMotionProps<"button">, "children"> & {
+type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   variant?: ButtonVariant;
   leadingIcon?: ReactNode;
   children?: ReactNode;
+  roll?: boolean;
 };
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "app-button-primary focus-visible:ring-accent",
@@ -19,22 +19,27 @@ export function Button({
   variant = "secondary",
   leadingIcon,
   children,
+  roll = true,
   type = "button",
   ...props
 }: ButtonProps): JSX.Element {
+  const content = (
+    <>
+      {leadingIcon}
+      {children}
+    </>
+  );
   return (
-    <MotionButton
-      whileTap={{ scale: 0.985 }}
+    <button
       className={cn(
-        "app-action-button inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-[0.66rem] font-bold uppercase tracking-[0.09em] transition-all duration-150 ease-premium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-line disabled:bg-shell disabled:text-muted",
+        "app-action-button inline-flex min-h-10 items-center justify-center gap-2 rounded-[2px] px-4 py-2 text-[0.68rem] font-bold uppercase tracking-[0.09em] transition-all duration-150 ease-premium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-line disabled:bg-shell disabled:text-muted",
         variantClasses[variant],
         className,
       )}
       type={type}
       {...props}
     >
-      {leadingIcon}
-      {children}
-    </MotionButton>
+      {roll ? <RollingText>{content}</RollingText> : content}
+    </button>
   );
 }
