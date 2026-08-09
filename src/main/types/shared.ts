@@ -87,6 +87,13 @@ export const desktopUpdateStatusValues = [
   "unavailable",
   "error",
 ] as const;
+export const cleanupCategoryValues = [
+  "run-artifacts",
+  "temporary-files",
+  "browser-cache",
+  "legacy-data",
+] as const;
+export const cleanupTriggerValues = ["automatic", "manual"] as const;
 
 export type DetectedType = (typeof detectedTypeValues)[number];
 export type TerminalStrategy = (typeof terminalStrategyValues)[number];
@@ -108,6 +115,8 @@ export type ActivityKind = (typeof activityKindValues)[number];
 export type BridgeStatus = (typeof bridgeStatusValues)[number];
 export type CommandRisk = (typeof commandRiskValues)[number];
 export type DesktopUpdateStatus = (typeof desktopUpdateStatusValues)[number];
+export type CleanupCategory = (typeof cleanupCategoryValues)[number];
+export type CleanupTrigger = (typeof cleanupTriggerValues)[number];
 
 export const SuggestedCommandSchema = z.object({
   label: z.string().trim().min(1).max(120),
@@ -374,6 +383,39 @@ export const DiagnosticCheckResultSchema = z.object({
   details: z.string().optional(),
 });
 
+export const CleanupCategorySummarySchema = z.object({
+  category: z.enum(cleanupCategoryValues),
+  label: z.string().min(1),
+  description: z.string().min(1),
+  fileCount: z.number().int().nonnegative(),
+  estimatedBytes: z.number().int().nonnegative(),
+});
+
+export const CleanupPreviewSchema = z.object({
+  generatedAt: z.string().min(1),
+  retentionDays: z.number().int().positive(),
+  totalFiles: z.number().int().nonnegative(),
+  estimatedBytes: z.number().int().nonnegative(),
+  categories: z.array(CleanupCategorySummarySchema),
+  protectedItems: z.array(z.string().min(1)),
+});
+
+export const CleanupReportSchema = z.object({
+  trigger: z.enum(cleanupTriggerValues),
+  appVersion: z.string().min(1),
+  startedAt: z.string().min(1),
+  completedAt: z.string().min(1),
+  removedFiles: z.number().int().nonnegative(),
+  reclaimedBytes: z.number().int().nonnegative(),
+  categories: z.array(CleanupCategorySummarySchema),
+  errors: z.array(z.string()).default([]),
+});
+
+export const CleanupStatusSchema = z.object({
+  preview: CleanupPreviewSchema,
+  lastReport: CleanupReportSchema.optional(),
+});
+
 export const DiagnosticsReportSchema = z.object({
   generatedAt: z.string().min(1),
   appName: z.string().min(1),
@@ -448,6 +490,12 @@ export type DesktopBridgeState = z.infer<typeof DesktopBridgeStateSchema>;
 export type CommandSafetySummary = z.infer<typeof CommandSafetySummarySchema>;
 export type RunningPort = z.infer<typeof RunningPortSchema>;
 export type DiagnosticCheckResult = z.infer<typeof DiagnosticCheckResultSchema>;
+export type CleanupCategorySummary = z.infer<
+  typeof CleanupCategorySummarySchema
+>;
+export type CleanupPreview = z.infer<typeof CleanupPreviewSchema>;
+export type CleanupReport = z.infer<typeof CleanupReportSchema>;
+export type CleanupStatus = z.infer<typeof CleanupStatusSchema>;
 export type DiagnosticsReport = z.infer<typeof DiagnosticsReportSchema>;
 export type ExportRunLogsInput = z.infer<typeof ExportRunLogsInputSchema>;
 export type DesktopUpdateState = z.infer<typeof DesktopUpdateStateSchema>;

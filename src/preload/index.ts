@@ -6,6 +6,8 @@ import type {
   BillingEvent,
   BulkImportCandidate,
   CommandRunResult,
+  CleanupReport,
+  CleanupStatus,
   CreateProjectInput,
   DetectionResult,
   DesktopBridgeState,
@@ -92,6 +94,10 @@ type LaunchStackApi = {
     testEditor: () => Promise<DiagnosticCheckResult>;
     testTerminal: () => Promise<DiagnosticCheckResult>;
     resetCommandApprovals: () => Promise<void>;
+  };
+  maintenance: {
+    getStatus: () => Promise<CleanupStatus>;
+    cleanup: () => Promise<CleanupReport>;
   };
   updates: {
     getState: () => Promise<DesktopUpdateState>;
@@ -230,6 +236,10 @@ const api: LaunchStackApi = {
     testTerminal: () => ipcRenderer.invoke("diagnostics:testTerminal"),
     resetCommandApprovals: () =>
       ipcRenderer.invoke("diagnostics:resetCommandApprovals"),
+  },
+  maintenance: {
+    getStatus: () => ipcRenderer.invoke("maintenance:getStatus"),
+    cleanup: () => ipcRenderer.invoke("maintenance:cleanup"),
   },
   updates: {
     getState: () => ipcRenderer.invoke("updates:getState"),

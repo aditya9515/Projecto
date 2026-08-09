@@ -33,6 +33,7 @@ Direct video file:
 - Keep project metadata visible during subscription downgrades while locking only features that exceed the Free plan.
 - Support offline handling with a full-page reconnect experience.
 - Provide update checks and Windows installer metadata through the hosted Projecto website.
+- Preview and safely clean old run artifacts, stale write leftovers, verified legacy metadata, and Electron caches without touching projects or credentials.
 - Keep the renderer sandboxed behind validated preload APIs and main-process services.
 
 ## Product Model
@@ -84,19 +85,27 @@ Projecto uses a preflight launch path before running commands:
 
 Projecto never kills unknown external processes that happen to use a port. It only manages ports detected from its own sessions.
 
+## Storage Maintenance
+
+Projecto runs a conservative allowlisted cleanup once per desktop version and
+also exposes a preview-and-confirm workflow in Settings. Run artifacts are kept
+for 30 days and capped at 250 MB. Active runs, project folders, current settings,
+command approvals, subscriptions, browser sessions, credentials, and recovery
+backups are always protected.
+
 ## Auto Update Flow
 
 The desktop app checks the hosted Projecto website for update metadata. The website returns the latest supported Windows installer version, file name, SHA-256 hash, setup URL, and Squirrel feed URL.
 
 Current desktop build target:
 
-- Version: `1.0.6`
-- Installer: `Projecto-1.0.6.Setup.exe`
+- Version: `1.0.7`
+- Installer: `Projecto-1.0.7.Setup.exe`
 - Release feed: GitHub Releases
 - Windows maker: Squirrel.Windows through Electron Forge
 
 The download page and update API are maintained in `D:\projecto_frontend` and
-must be updated when the `1.0.6` artifacts are published.
+must be updated when the `1.0.7` artifacts are published.
 
 ## Setup
 

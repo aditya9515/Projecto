@@ -3,6 +3,7 @@ import { parseUpgradeReason } from "../../billing/upgradeGate";
 import type { AppSettingsUpdate } from "../../main/types/shared";
 import { AccountBillingSettings } from "../components/settings/AccountBillingSettings";
 import { SettingsForm } from "../components/settings/SettingsForm";
+import { StorageCleanupSettings } from "../components/settings/StorageCleanupSettings";
 import { useAppStatusStore } from "../store/useAppStatusStore";
 import { useProjectsStore } from "../store/useProjectsStore";
 import { useSettingsStore } from "../store/useSettingsStore";
@@ -193,6 +194,7 @@ export function SettingsPage(): JSX.Element {
         projectCount={projects.length}
         subscription={subscription}
       />
+      <StorageCleanupSettings />
       <SettingsForm
         onExportDiagnostics={() =>
           runDiagnosticAction(

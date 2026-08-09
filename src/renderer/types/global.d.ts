@@ -4,6 +4,8 @@ import type {
   BillingEvent,
   BulkImportCandidate,
   CommandRunResult,
+  CleanupReport,
+  CleanupStatus,
   CreateProjectInput,
   DetectionResult,
   DesktopBridgeState,
@@ -102,6 +104,10 @@ declare global {
         testEditor: () => Promise<DiagnosticCheckResult>;
         testTerminal: () => Promise<DiagnosticCheckResult>;
         resetCommandApprovals: () => Promise<void>;
+      };
+      maintenance: {
+        getStatus: () => Promise<CleanupStatus>;
+        cleanup: () => Promise<CleanupReport>;
       };
       updates: {
         getState: () => Promise<DesktopUpdateState>;
