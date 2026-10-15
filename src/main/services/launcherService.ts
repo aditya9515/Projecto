@@ -22,6 +22,7 @@ import {
   RunEventSchema,
 } from "../types/shared";
 import { getRunnableProfileCommands } from "../../shared/launchResolution";
+import { SerialTaskQueue } from "../../shared/serialTaskQueue";
 import {
   createProjectAlreadyRunningError,
   createProjectPortOwnedError,
@@ -195,6 +196,17 @@ export class LauncherService {
   private readonly reportedDetectedUrls = new Set<string>();
   private readonly reportedPortFallbacks = new Set<string>();
   private readonly reportedNextLockErrors = new Set<string>();
+  private readonly launchTasks = new SerialTaskQueue();
+  private readonly pendingProjectIds = new Set<string>();
+  private readonly outputBuffers = new Map<string, string>();
+
+  private admitLaunch<T>(projectId: string, operation: () => Promise<T>): Promise<T> {
+    if (this.pendingProjectIds.has(projectId) || this.stoppingProjectIds.has(projectId)) {
+      return Promise.reject(createProjectAlreadyRunningError(projectId));
+    }
+    this.pendingProjectIds.add(projectId);
+    return this.launchTasks.run(operation).finally(() => this.pendingProjectIds.delete(projectId));
+  }
 
   constructor(
     private readonly projectStore: ProjectStore,
@@ -304,6 +316,10 @@ export class LauncherService {
     commandId: string,
     options?: CommandApprovalOptions,
   ): Promise<CommandRunResult> {
+    return this.admitLaunch(projectId, () => this.runCommandInternal(projectId, commandId, options));
+  }
+
+  private async runCommandInternal(projectId: string, commandId: string, options?: CommandApprovalOptions): Promise<CommandRunResult> {
     const project = await this.projectStore.getProject(projectId);
 
     if (!project) {
@@ -342,16 +358,7 @@ export class LauncherService {
       lastMessage: `Running ${command.label}`,
     });
 
-    await this.projectStore.updateProject(projectId, {
-      launchCount: project.launchCount + 1,
-      lastOpenedAt: new Date().toISOString(),
-    });
-    await this.activityStore.recordActivity({
-      kind: "run-command",
-      title: `Ran ${command.label}`,
-      description: project.name,
-      projectId: project.id,
-    });
+    await this.saveLaunchHistory(project, result.runId, "run-command", `Ran ${command.label}`);
 
     return result;
   }
@@ -361,6 +368,10 @@ export class LauncherService {
     profileId: string,
     options?: CommandApprovalOptions,
   ): Promise<LaunchResult> {
+    return this.admitLaunch(projectId, () => this.launchProfileInternal(projectId, profileId, options));
+  }
+
+  private async launchProfileInternal(projectId: string, profileId: string, options?: CommandApprovalOptions): Promise<LaunchResult> {
     const project = await this.projectStore.getProject(projectId);
 
     if (!project) {
@@ -447,7 +458,7 @@ export class LauncherService {
       }
     } catch (error) {
       for (const result of startedResults) {
-        if (!this.stopRun(result.runId)) {
+        if (!(this.stopRun(result.runId) || await this.commandRunner.closeExternalRun(result.runId))) {
           this.emitRunEvent({
             runId: result.runId,
             projectId: project.id,
@@ -464,7 +475,15 @@ export class LauncherService {
         }
       }
       this.launchReadiness.delete(launchId);
-      await this.clearTerminalSession(project.id);
+      if (startedResults.some((result) => this.activeRunMetadata.has(result.runId))) {
+        await this.createTerminalSession(project, settings.terminalStrategy, {
+          launchId, profileId, runIds: startedResults.map((result) => result.runId),
+          activeRunId: startedResults[0]?.runId, status: "running",
+          lastMessage: "Launch failed; a surviving terminal may still need to be stopped.",
+        });
+      } else {
+        await this.clearTerminalSession(project.id);
+      }
       this.emitRunEvent({
         runId: launchId,
         projectId: project.id,
@@ -514,16 +533,7 @@ export class LauncherService {
       );
     }
 
-    await this.projectStore.updateProject(projectId, {
-      launchCount: project.launchCount + 1,
-      lastOpenedAt: new Date().toISOString(),
-    });
-    await this.activityStore.recordActivity({
-      kind: "launch-profile",
-      title: `Launched ${profile.name}`,
-      description: project.name,
-      projectId: project.id,
-    });
+    await this.saveLaunchHistory(project, launchId, "launch-profile", `Launched ${profile.name}`);
 
     return LaunchResultSchema.parse({
       launchId,
@@ -547,6 +557,9 @@ export class LauncherService {
   }
 
   async stopProjectTerminal(projectId: string): Promise<boolean> {
+    for (const [launchId, entry] of this.launchReadiness) {
+      if (entry.projectId === projectId) this.launchReadiness.delete(launchId);
+    }
     const sessions = await this.terminalSessionStore.getSessions();
     const session = sessions.find(
       (entry) =>
@@ -607,8 +620,9 @@ export class LauncherService {
     return stopped;
   }
 
-  stopAllRuns(): void {
-    this.commandRunner.stopAll();
+  async stopAllRuns(): Promise<void> {
+    this.launchReadiness.clear();
+    await this.commandRunner.stopAll();
   }
 
   async getCommandSafety(projectId: string): Promise<CommandSafetySummary[]> {
@@ -631,11 +645,8 @@ export class LauncherService {
       return sessions;
     }
 
-    for (const session of clearableStoppingSessions) {
-      await this.clearTerminalSession(session.projectId);
-    }
-
-    return this.terminalSessionStore.getSessions();
+    // A stopping marker does not prove the process has exited. Explicit stop/recovery owns clearing it.
+    return sessions;
   }
 
   private trackActiveRun(event: RunEvent): void {
@@ -1016,6 +1027,7 @@ export class LauncherService {
           bestCandidate.runId,
         ),
       });
+      if (!this.launchReadiness.has(launchId)) return;
       await this.openUrlOnce(
         bestCandidate.runId ?? launchId,
         bestCandidate.url,
@@ -1171,7 +1183,13 @@ export class LauncherService {
     );
     this.events.emit("run-event", event);
     this.processLaunchOutputSignals(event);
-    void this.updateTerminalSessionFromRunEvent(event);
+    void this.updateTerminalSessionFromRunEvent(event).catch((error) => {
+      // Do not recursively process the warning if the persistence layer is unavailable.
+      this.events.emit("run-event", {
+        ...event, kind: "system", status: undefined,
+        message: `Terminal state could not be saved: ${error instanceof Error ? error.message : "Unknown storage error"}`,
+      } satisfies RunEvent);
+    });
 
     if (event.kind !== "status") {
       return;
@@ -1222,6 +1240,7 @@ export class LauncherService {
   }
 
   private cleanupRunTracking(runId: string, launchId?: string): void {
+    this.outputBuffers.delete(runId);
     for (const key of [...this.reportedDetectedUrls]) {
       if (key.startsWith(`${runId}:`)) {
         this.reportedDetectedUrls.delete(key);
@@ -1251,7 +1270,9 @@ export class LauncherService {
       return;
     }
 
-    const signals = detectLaunchOutputSignals(event.message);
+    const buffered = ((this.outputBuffers.get(event.runId) ?? "") + event.message).slice(-65_536);
+    this.outputBuffers.set(event.runId, buffered);
+    const signals = detectLaunchOutputSignals(buffered);
     const detectedPorts = signals.ports.map((port) =>
       this.buildLaunchPort({
         projectId: event.projectId,
@@ -1457,7 +1478,7 @@ export class LauncherService {
   ): void {
     const readiness = this.launchReadiness.get(launchId);
 
-    if (readiness?.readyEmitted) {
+    if (!readiness || readiness.readyEmitted) {
       return;
     }
 
@@ -1479,6 +1500,21 @@ export class LauncherService {
     }
 
     this.emitReadyEvent(projectId, launchId, runId, message, url);
+  }
+
+  private reportBookkeepingFailure(projectId: string, runId: string, error: unknown): void {
+    this.emitRunEvent({ projectId, runId, kind: "system", timestamp: new Date().toISOString(),
+      message: `The terminal started, but saving launch history failed: ${error instanceof Error ? error.message : "Unknown error"}` });
+  }
+
+  private async saveLaunchHistory(project: Project, runId: string, kind: "run-command" | "launch-profile", title: string): Promise<void> {
+    const operations = [
+      () => this.projectStore.updateProject(project.id, { launchCount: project.launchCount + 1, lastOpenedAt: new Date().toISOString() }),
+      () => this.activityStore.recordActivity({ kind, title, description: project.name, projectId: project.id }),
+    ];
+    for (const operation of operations) {
+      try { await operation(); } catch (error) { this.reportBookkeepingFailure(project.id, runId, error); }
+    }
   }
 
   private async updateTerminalSessionFromRunEvent(

@@ -2,6 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
 import { Button } from "./Button";
+import { useState } from "react";
 type ConfirmDialogProps = {
   open: boolean;
   title: string;
@@ -22,8 +23,10 @@ export function ConfirmDialog({
   onConfirm,
   onOpenChange,
 }: ConfirmDialogProps): JSX.Element {
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string>();
   return (
-    <Dialog.Root onOpenChange={onOpenChange} open={open}>
+    <Dialog.Root onOpenChange={(value) => { if (!confirming) { setError(undefined); onOpenChange(value); } }} open={open}>
       <AnimatePresence>
         {open ? (
           <Dialog.Portal forceMount>
@@ -72,16 +75,22 @@ export function ConfirmDialog({
                     </div>
                   ) : null}
                   <div className="mt-6 flex justify-end gap-3">
-                    <Button onClick={() => onOpenChange(false)} variant="ghost">
+                    {error ? <p role="alert">{error}</p> : null}
+                    <Button disabled={confirming} onClick={() => onOpenChange(false)} variant="ghost">
                       Cancel
                     </Button>
                     <Button
-                      onClick={() => {
-                        void onConfirm();
+                      disabled={confirming}
+                      onClick={async () => {
+                        if (confirming) return;
+                        setConfirming(true);
+                        setError(undefined);
+                        try { await onConfirm(); } catch (cause) { setError(cause instanceof Error ? cause.message : "The operation failed."); }
+                        finally { setConfirming(false); }
                       }}
                       variant={destructive ? "danger" : "primary"}
                     >
-                      {confirmLabel}
+                      {confirming ? "Working…" : confirmLabel}
                     </Button>
                   </div>
                 </motion.div>

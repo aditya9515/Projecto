@@ -5,9 +5,11 @@ import {
   type ProjectTerminalSession,
 } from "../types/shared";
 import { FileSystemService } from "./fileSystemService";
+import { SerialTaskQueue } from "../../shared/serialTaskQueue";
 
 export class TerminalSessionStore {
   private readonly filePath: string;
+  private readonly tasks = new SerialTaskQueue();
 
   constructor(
     private readonly fileSystemService: FileSystemService,
@@ -17,6 +19,10 @@ export class TerminalSessionStore {
   }
 
   async getSessions(): Promise<ProjectTerminalSession[]> {
+    return this.tasks.run(() => this.loadSessions());
+  }
+
+  private async loadSessions(): Promise<ProjectTerminalSession[]> {
     try {
       const raw = await this.fileSystemService.readJsonFile<unknown>(
         this.filePath,
@@ -59,8 +65,12 @@ export class TerminalSessionStore {
   async upsertSession(
     session: ProjectTerminalSession,
   ): Promise<ProjectTerminalSession> {
+    return this.tasks.run(() => this.upsertSessionInternal(session));
+  }
+
+  private async upsertSessionInternal(session: ProjectTerminalSession): Promise<ProjectTerminalSession> {
     const parsed = ProjectTerminalSessionSchema.parse(session);
-    const sessions = await this.getSessions();
+    const sessions = await this.loadSessions();
     const next = [
       parsed,
       ...sessions.filter((entry) => entry.projectId !== parsed.projectId),
@@ -73,7 +83,8 @@ export class TerminalSessionStore {
     projectId: string,
     patch: Partial<Omit<ProjectTerminalSession, "projectId" | "createdAt">>,
   ): Promise<ProjectTerminalSession | null> {
-    const sessions = await this.getSessions();
+    return this.tasks.run(async () => {
+    const sessions = await this.loadSessions();
     const current = sessions.find((entry) => entry.projectId === projectId);
 
     if (!current) {
@@ -85,15 +96,18 @@ export class TerminalSessionStore {
       ...patch,
       updatedAt: new Date().toISOString(),
     });
-    await this.upsertSession(next);
+    await this.upsertSessionInternal(next);
     return next;
+    });
   }
 
   async clearSession(projectId: string): Promise<void> {
-    const sessions = await this.getSessions();
+    return this.tasks.run(async () => {
+    const sessions = await this.loadSessions();
     await this.persist(
       sessions.filter((entry) => entry.projectId !== projectId),
     );
+    });
   }
 
   private async persist(sessions: ProjectTerminalSession[]): Promise<void> {

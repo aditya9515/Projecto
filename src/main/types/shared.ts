@@ -247,6 +247,7 @@ export const DesktopEntitlementsSchema = z.object({
 });
 
 export const SubscriptionStateSchema = z.object({
+  userId: z.string().min(1).optional(),
   plan: z.enum(planValues),
   status: z.enum(subscriptionStatusValues),
   email: z.string().email().optional(),

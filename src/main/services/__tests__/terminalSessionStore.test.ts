@@ -15,6 +15,17 @@ describe("TerminalSessionStore", () => {
     return new TerminalSessionStore(new FileSystemService(), directory);
   }
 
+  it("preserves independent concurrent upserts", async () => {
+    const store = await createStore();
+    const now = new Date().toISOString();
+    await Promise.all(["one", "two", "three"].map((projectId) => store.upsertSession({
+      projectId, projectName: projectId, projectPath: `D:/${projectId}`,
+      runIds: [], terminalStrategy: "os-external", status: "running",
+      detectedUrls: [], detectedPorts: [], createdAt: now, updatedAt: now,
+    })));
+    expect((await store.getSessions()).map((session) => session.projectId).sort()).toEqual(["one", "three", "two"]);
+  });
+
   it("persists, updates, and clears project terminal mappings", async () => {
     const store = await createStore();
     const now = new Date().toISOString();

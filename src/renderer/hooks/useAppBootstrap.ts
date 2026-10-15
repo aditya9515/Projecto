@@ -239,6 +239,7 @@ export function useAppBootstrap(): void {
   }, [loadUsageStats, pushEvent, pushLaunchFailure, pushToast]);
   useEffect(() => {
     return window.launchStack.billing.onBillingEvent((event) => {
+      if (event.type === "auth-completed") { resetProjects(); resetUsageStats(); }
       applyBillingEvent(event);
       setBillingEvent(event);
       if (event.subscription?.status === "active") {
@@ -276,6 +277,8 @@ export function useAppBootstrap(): void {
     });
   }, [
     applyBillingEvent,
+    resetProjects,
+    resetUsageStats,
     closeUpgradeModal,
     loadProjects,
     markSynced,

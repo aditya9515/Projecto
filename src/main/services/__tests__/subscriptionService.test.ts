@@ -36,7 +36,7 @@ describe("SubscriptionService", () => {
     await service.startGoogleSignIn();
 
     expect(openExternal).toHaveBeenCalledWith(
-      "https://projecto.adityakosuru.online/desktop-login?source=desktop",
+      expect.stringContaining("https://projecto.adityakosuru.online/desktop-login?source=desktop&desktopState="),
     );
   });
 
@@ -138,7 +138,7 @@ describe("SubscriptionService", () => {
       }),
     );
     expect(openExternal).toHaveBeenCalledWith(
-      "https://projecto.adityakosuru.online/desktop-login?source=desktop",
+      expect.stringContaining("https://projecto.adityakosuru.online/desktop-login?source=desktop&desktopState="),
     );
 
     vi.unstubAllGlobals();
@@ -223,8 +223,13 @@ describe("SubscriptionService", () => {
       billingUrl: "https://projecto.adityakosuru.online/pricing",
     });
 
+    await service.startGoogleSignIn();
+    const loginUrl = new URL(openExternal.mock.calls.at(-1)![0]);
+    const state = loginUrl.searchParams.get("desktopState")!;
+    expect(state).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect(loginUrl.searchParams.get("codeChallenge")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const handled = await service.handleProtocolUrl(
-      "projecto://auth/callback?code=desktop-code&state=desktop-state",
+      `projecto://auth/callback?code=desktop-code&state=${state}`,
     );
 
     expect(handled).toBe(true);
@@ -238,6 +243,7 @@ describe("SubscriptionService", () => {
       expect.objectContaining({
         sessionToken: "desktop-session-token",
         state: expect.objectContaining({
+          userId: "user-1",
           plan: "pro",
           status: "active",
           email: "adi@example.com",
@@ -248,6 +254,16 @@ describe("SubscriptionService", () => {
       }),
     );
 
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects unsolicited callbacks without exchanging or replacing a session", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const service = new SubscriptionService({ persistence, openExternal });
+    await service.handleProtocolUrl("projecto://auth/callback?code=attacker-code&state=attacker-state");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(persistence.saveRecord).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 

@@ -1,7 +1,7 @@
 {
   "name": "projecto",
   "productName": "Projecto",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "An Electron desktop app for managing, syncing, and launching developer projects through the Projecto platform.",
   "main": ".webpack/main",
   "private": true,
@@ -34,7 +34,7 @@
     "framer-motion": "^12.38.0",
     "gsap": "^3.15.0",
     "lucide-react": "^0.468.0",
-    "projecto-protocol": "file:../projecto-protocol",
+    "projecto-protocol": "file:vendor/projecto-protocol",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.28.0",

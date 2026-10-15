@@ -1,4 +1,5 @@
-import { dialog, ipcMain, type OpenDialogOptions } from "electron";
+import { handleTrusted } from "./trustedSender";
+import { dialog, type OpenDialogOptions } from "electron";
 import { z } from "zod";
 
 import {
@@ -30,7 +31,7 @@ export function registerProjectIpc({
   activityStore,
   subscriptionService,
 }: RegisterProjectIpcOptions): void {
-  ipcMain.handle("projects:selectFolder", async () => {
+  handleTrusted("projects:selectFolder", async () => {
     const window = getMainWindow();
     const options: OpenDialogOptions = {
       title: "Select a project folder",
@@ -47,11 +48,11 @@ export function registerProjectIpc({
     return result.filePaths[0] ?? null;
   });
 
-  ipcMain.handle("projects:scanFolder", async (_event, input) => {
+  handleTrusted("projects:scanFolder", async (_event, input) => {
     return projectScanner.scanFolder(pathSchema.parse(input));
   });
 
-  ipcMain.handle("projects:scanWorkspace", async (_event, input) => {
+  handleTrusted("projects:scanWorkspace", async (_event, input) => {
     const subscription = await subscriptionService.getSubscriptionState();
 
     if (!canUseBulkImport(subscription)) {
@@ -61,15 +62,15 @@ export function registerProjectIpc({
     return projectScanner.scanWorkspace(pathSchema.parse(input));
   });
 
-  ipcMain.handle("projects:getProjects", async () => {
+  handleTrusted("projects:getProjects", async () => {
     return projectStore.getProjects();
   });
 
-  ipcMain.handle("projects:getProject", async (_event, input) => {
+  handleTrusted("projects:getProject", async (_event, input) => {
     return projectStore.getProject(idSchema.parse(input));
   });
 
-  ipcMain.handle("projects:createProject", async (_event, input) => {
+  handleTrusted("projects:createProject", async (_event, input) => {
     const project = await projectStore.createProject(
       CreateProjectInputSchema.parse(input),
     );
@@ -82,7 +83,7 @@ export function registerProjectIpc({
     return project;
   });
 
-  ipcMain.handle("projects:bulkImportProjects", async (_event, input) => {
+  handleTrusted("projects:bulkImportProjects", async (_event, input) => {
     const payload = bulkImportSchema.parse(input);
     const projects = await projectStore.bulkImportProjects(payload);
 
@@ -100,18 +101,18 @@ export function registerProjectIpc({
     return projects;
   });
 
-  ipcMain.handle("projects:updateProject", async (_event, id, patch) => {
+  handleTrusted("projects:updateProject", async (_event, id, patch) => {
     const projectId = idSchema.parse(id);
     const payload = ProjectUpdateSchema.parse(patch);
 
     return projectStore.updateProject(projectId, payload);
   });
 
-  ipcMain.handle("projects:deleteProject", async (_event, input) => {
+  handleTrusted("projects:deleteProject", async (_event, input) => {
     await projectStore.deleteProject(idSchema.parse(input));
   });
 
-  ipcMain.handle("projects:toggleFavorite", async (_event, input) => {
+  handleTrusted("projects:toggleFavorite", async (_event, input) => {
     return projectStore.toggleFavorite(idSchema.parse(input));
   });
 }

@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { StringDecoder } from "node:string_decoder";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -495,7 +496,14 @@ export class CommandRunner {
       `Queued ${request.command.label}`,
     );
     if (isOsExternalStrategy(request.terminalStrategy)) {
-      await this.openMirroredExternalTerminal(request, runId, resolvedCwd);
+      try {
+        await this.openMirroredExternalTerminal(request, runId, resolvedCwd);
+        emitStatus(this.events, request, runId, "spawned", `Started ${request.command.label}`);
+      } catch (error) {
+        await this.clearExternalRunState(runId);
+        emitStatus(this.events, request, runId, "failed", error instanceof Error ? error.message : "Terminal creation failed.");
+        throw error;
+      }
 
       return CommandRunResultSchema.parse({
         runId,
@@ -616,10 +624,11 @@ export class CommandRunner {
     return true;
   }
 
-  stopAll(): void {
+  async stopAll(): Promise<void> {
     for (const runId of [...this.activeChildren.keys()]) {
       this.stopRun(runId);
     }
+    await Promise.allSettled([...this.externalRuns.keys()].map((runId) => this.closeExternalRun(runId)));
   }
 
   private async openMirroredExternalTerminal(
@@ -672,6 +681,7 @@ export class CommandRunner {
     const commandPath = path.join(this.runsDirectory, `${runId}.cmd`);
     const scriptPath = path.join(this.runsDirectory, `${runId}.ps1`);
     const processPath = this.getExternalRunProcessPath(runId);
+    const exitPath = path.join(this.runsDirectory, `${runId}.exit`);
     const safeCwd = cwd.replace(/"/g, '""');
 
     await fs.writeFile(
@@ -697,6 +707,7 @@ export class CommandRunner {
         `$cmdPath = '${escapePowerShellSingleQuoted(commandPath)}'`,
         `$logPath = '${escapePowerShellSingleQuoted(logPath)}'`,
         `$processPath = '${escapePowerShellSingleQuoted(processPath)}'`,
+        `$exitPath = '${escapePowerShellSingleQuoted(exitPath)}'`,
         "$utf8NoBom = [System.Text.UTF8Encoding]::new($false)",
         "[System.IO.File]::WriteAllText($processPath, \"$PID|$([Diagnostics.Process]::GetCurrentProcess().StartTime.ToFileTimeUtc())\", $utf8NoBom)",
         "$script:projectoExitCode = 0",
@@ -709,6 +720,8 @@ export class CommandRunner {
         "function Write-ProjectoFinalStatus {",
         "  if ($script:projectoFinalized) { return }",
         "  $script:projectoFinalized = $true",
+        "  [System.IO.File]::WriteAllText($exitPath + '.tmp', [string] $script:projectoExitCode, $utf8NoBom)",
+        "  Move-Item -LiteralPath ($exitPath + '.tmp') -Destination $exitPath -Force",
         `  $marker = '${EXTERNAL_EXIT_MARKER}' + $script:projectoExitCode`,
         "  [System.IO.File]::AppendAllText($logPath, $marker + [Environment]::NewLine, $utf8NoBom)",
         "  Write-Host $marker",
@@ -762,6 +775,8 @@ export class CommandRunner {
         "projecto_finalize() {",
         '  if [ "$projecto_finalized" -eq 1 ]; then return; fi',
         "  projecto_finalized=1",
+        `  printf '%s\\n' "$projecto_exit_code" > ${quoteBash(path.join(this.runsDirectory, `${runId}.exit.tmp`))}`,
+        `  mv -- ${quoteBash(path.join(this.runsDirectory, `${runId}.exit.tmp`))} ${quoteBash(path.join(this.runsDirectory, `${runId}.exit`))}`,
         `  printf '%s%s\\n' '${EXTERNAL_EXIT_MARKER}' "$projecto_exit_code" | tee -a ${quoteBash(logPath)}`,
         '  printf "\\nProjecto mirrored this terminal output into the desktop Run Logs.\\n"',
         "}",
@@ -831,8 +846,11 @@ export class CommandRunner {
   ): void {
     let offset = 0;
     let finished = false;
-    const startedAt = Date.now();
-    const timeoutMs = this.externalTailTimeoutMs;
+    let lastOutputAt = Date.now();
+    let warnedIdle = false;
+    let polling = false;
+    let decoder = new StringDecoder("utf8");
+    const exitPath = path.join(this.runsDirectory, `${runId}.exit`);
 
     const stopTailing = () => {
       const tailer = this.externalTailers.get(runId);
@@ -844,102 +862,55 @@ export class CommandRunner {
     };
 
     const tailer = setInterval(() => {
-      void fs
-        .readFile(logPath, "utf8")
-        .then((content) => {
-          if (offset >= content.length) {
-            if (!finished && Date.now() - startedAt > timeoutMs) {
-              finished = true;
-              emitStatus(
-                this.events,
-                request,
-                runId,
-                "stopped",
-                "External terminal stopped responding or was closed. Session marked as stopped.",
-                null,
-              );
-              this.externalRuns.delete(runId);
-              stopTailing();
+      if (polling || finished) return;
+      polling = true;
+      void (async () => {
+        const handle = await fs.open(logPath, "r");
+        let caughtUp = false;
+        try {
+          const stat = await handle.stat();
+          if (stat.size < offset) { offset = 0; decoder = new StringDecoder("utf8"); }
+          const size = Math.min(Math.max(0, stat.size - offset), 256 * 1024);
+          if (size > 0) {
+            const buffer = Buffer.allocUnsafe(size);
+            const { bytesRead } = await handle.read(buffer, 0, size, offset);
+            offset += bytesRead;
+            const chunk = decoder.write(buffer.subarray(0, bytesRead));
+            if (!this.externalTailers.has(runId)) return;
+            if (chunk) {
+              lastOutputAt = Date.now();
+              warnedIdle = false;
+              this.events.emit("run-event", {
+                runId, projectId: request.projectId, launchId: request.launchId,
+                profileId: request.profileId, commandId: request.command.id,
+                kind: "stdout", message: chunk, timestamp: new Date().toISOString(),
+                executionMode: request.terminalStrategy, managed: false,
+              } satisfies RunEvent);
             }
-            return;
           }
+          caughtUp = offset >= stat.size;
+        } finally { await handle.close(); }
 
-          const chunk = content.slice(offset);
-          offset = content.length;
-
-          if (chunk.length > 0) {
-            this.events.emit("run-event", {
-              runId,
-              projectId: request.projectId,
-              launchId: request.launchId,
-              profileId: request.profileId,
-              commandId: request.command.id,
-              kind: "stdout",
-              message: chunk,
-              timestamp: new Date().toISOString(),
-              executionMode: request.terminalStrategy,
-              managed: false,
-            } satisfies RunEvent);
-          }
-
-          const markerLine = content
-            .split(/\r?\n/)
-            .find((line) => line.includes(EXTERNAL_EXIT_MARKER));
-
-          if (!finished && markerLine) {
-            finished = true;
-            const exitCode = Number(
-              markerLine
-                .slice(
-                  markerLine.indexOf(EXTERNAL_EXIT_MARKER) +
-                    EXTERNAL_EXIT_MARKER.length,
-                )
-                .trim(),
-            );
-            emitStatus(
-              this.events,
-              request,
-              runId,
-              exitCode === 0 ? "completed" : "failed",
-              Number.isFinite(exitCode)
-                ? `OS terminal command exited with code ${exitCode}.`
-                : "OS terminal command finished.",
-              Number.isFinite(exitCode) ? exitCode : undefined,
-            );
-            this.events.emit("run-event", {
-              runId,
-              projectId: request.projectId,
-              launchId: request.launchId,
-              profileId: request.profileId,
-              commandId: request.command.id,
-              kind: "system",
-              message: Number.isFinite(exitCode)
-                ? `External terminal command exited with code ${exitCode}.`
-                : "External terminal command finished.",
-              timestamp: new Date().toISOString(),
-              exitCode: Number.isFinite(exitCode) ? exitCode : undefined,
-              executionMode: request.terminalStrategy,
-              managed: false,
-            } satisfies RunEvent);
-            this.externalRuns.delete(runId);
-            stopTailing();
-          }
-        })
-        .catch(() => {
-          if (!finished && Date.now() - startedAt > timeoutMs) {
-            finished = true;
-            emitStatus(
-              this.events,
-              request,
-              runId,
-              "stopped",
-              "External terminal stopped responding or was closed. Session marked as stopped.",
-              null,
-            );
-            this.externalRuns.delete(runId);
-            stopTailing();
-          }
-        });
+        if (!this.externalTailers.has(runId) || !caughtUp) return;
+        const exitText = await fs.readFile(exitPath, "utf8").catch(() => undefined);
+        if (exitText && /^-?\d{1,10}$/.test(exitText.trim())) {
+          const exitCode = Number(exitText.trim());
+          finished = true;
+          emitStatus(this.events, request, runId, exitCode === 0 ? "completed" : "failed",
+            `OS terminal command exited with code ${exitCode}.`, exitCode);
+          this.externalRuns.delete(runId);
+          stopTailing();
+        } else if (!warnedIdle && Date.now() - lastOutputAt > this.externalTailTimeoutMs) {
+          warnedIdle = true;
+          this.events.emit("run-event", {
+            runId, projectId: request.projectId, commandId: request.command.id,
+            kind: "system", message: "The terminal is quiet. Its process has not been confirmed stopped; use Stop to check or close it.",
+            timestamp: new Date().toISOString(), executionMode: request.terminalStrategy, managed: false,
+          } satisfies RunEvent);
+        }
+      })().catch(() => {
+        // A temporary read failure is not evidence that the process exited.
+      }).finally(() => { polling = false; });
     }, 500);
 
     tailer.unref?.();

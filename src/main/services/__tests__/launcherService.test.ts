@@ -1117,7 +1117,25 @@ describe("LauncherService", () => {
     expect(commandRunner.runCommand).not.toHaveBeenCalled();
   });
 
-  it("clears stale stopping sessions before enforcing concurrent launch limits", async () => {
+  it("reserves a project before asynchronous launch checks", async () => {
+    const service = createLauncherService();
+    const pending = service.runCommand(project.id, "command-1");
+    await expect(service.runCommand(project.id, "command-1")).rejects.toThrow();
+    await pending;
+    expect(commandRunner.runCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a successful launch successful when remote history is unavailable", async () => {
+    projectStore.updateProject.mockRejectedValueOnce(new Error("backend unavailable"));
+    const service = createLauncherService();
+    const events: unknown[] = [];
+    service.onRunEvent((event) => events.push(event));
+    await expect(service.runCommand(project.id, "command-1")).resolves.toMatchObject({ runId: "run-1" });
+    expect(events).toContainEqual(expect.objectContaining({ kind: "system", message: expect.stringContaining("history") }));
+    expect(commandRunner.stopRun).not.toHaveBeenCalled();
+  });
+
+  it("counts stopping sessions until the terminal confirms it has stopped", async () => {
     subscriptionService.getSubscriptionState.mockResolvedValue({
       plan: "free",
       status: "active",
@@ -1151,12 +1169,10 @@ describe("LauncherService", () => {
     ]);
     const launcherService = createLauncherService();
 
-    await launcherService.launchProfile(project.id, "profile-1");
-
-    expect(terminalSessionStore.clearSession).toHaveBeenCalledWith(
-      "project-2",
-    );
-    expect(commandRunner.runCommand).toHaveBeenCalledTimes(1);
+    await expect(launcherService.launchProfile(project.id, "profile-1"))
+      .rejects.toThrow("UPGRADE_REQUIRED:concurrentLaunches");
+    expect(terminalSessionStore.clearSession).not.toHaveBeenCalled();
+    expect(commandRunner.runCommand).not.toHaveBeenCalled();
   });
 
   it("stops started background runs when a later profile command fails", async () => {
