@@ -1,9 +1,11 @@
 import path from "node:path";
 
 import { app, BrowserWindow, shell } from "electron";
+import { trustMainWindow } from "./ipc/trustedSender";
 
 function getWindowIconPath(): string {
-  return path.join(app.getAppPath(), "assets", "icon.ico");
+  const extension = process.platform === "win32" ? "ico" : "png";
+  return path.join(app.getAppPath(), "assets", `icon.${extension}`);
 }
 
 export function createMainWindow(): BrowserWindow {
@@ -27,9 +29,16 @@ export function createMainWindow(): BrowserWindow {
   window.once("ready-to-show", () => {
     window.show();
   });
+  trustMainWindow(window.webContents);
+
+  const entry = new URL(MAIN_WINDOW_WEBPACK_ENTRY);
+  window.webContents.on("will-navigate", (event, target) => {
+    const candidate = new URL(target);
+    if (candidate.protocol !== entry.protocol || candidate.host !== entry.host || candidate.pathname !== entry.pathname) event.preventDefault();
+  });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    try { if (new URL(url).protocol === "https:") void shell.openExternal(url); } catch { /* Reject malformed external links. */ }
     return { action: "deny" };
   });
 

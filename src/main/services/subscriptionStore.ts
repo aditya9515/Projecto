@@ -32,6 +32,7 @@ export type SubscriptionRecord = {
 
 export class SubscriptionStore {
   private readonly filePath: string;
+  private memorySessionToken?: string;
 
   constructor(
     private readonly fileSystemService: FileSystemService,
@@ -44,9 +45,9 @@ export class SubscriptionStore {
     const stored = await this.loadRecord();
     return {
       state: stored.state,
-      sessionToken: stored.encryptedSessionToken
+      sessionToken: (stored.encryptedSessionToken
         ? this.decrypt(stored.encryptedSessionToken)
-        : undefined,
+        : undefined) ?? this.memorySessionToken,
       deviceId: stored.deviceId,
       deviceName: stored.deviceName,
       devicePlatform: stored.devicePlatform,
@@ -59,6 +60,7 @@ export class SubscriptionStore {
   }
 
   async saveRecord(record: SubscriptionRecord): Promise<void> {
+    this.memorySessionToken = record.sessionToken;
     await this.persist({
       state: SubscriptionStateSchema.parse(record.state),
       encryptedSessionToken: record.sessionToken
@@ -128,21 +130,27 @@ export class SubscriptionStore {
     await this.fileSystemService.moveFile(this.filePath, backupPath);
   }
 
-  private encrypt(value: string): string {
-    if (safeStorage.isEncryptionAvailable()) {
+  private protectedStorageAvailable(): boolean {
+    return safeStorage.isEncryptionAvailable() &&
+      (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text");
+  }
+
+  private encrypt(value: string): string | undefined {
+    if (this.protectedStorageAvailable()) {
       return safeStorage.encryptString(value).toString("base64");
     }
 
-    return Buffer.from(value, "utf8").toString("base64");
+    // Keep the credential in memory only when OS-protected storage is unavailable.
+    return undefined;
   }
 
-  private decrypt(value: string): string {
+  private decrypt(value: string): string | undefined {
     const buffer = Buffer.from(value, "base64");
 
-    if (safeStorage.isEncryptionAvailable()) {
-      return safeStorage.decryptString(buffer);
+    if (this.protectedStorageAvailable()) {
+      try { return safeStorage.decryptString(buffer); } catch { return undefined; }
     }
 
-    return buffer.toString("utf8");
+    return undefined;
   }
 }

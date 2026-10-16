@@ -127,6 +127,7 @@ export const useLogsStore = create<LogsState>((set) => ({
   activeRunId: null,
   filter: "all",
   pushEvent: (event) => {
+    if (event.message.length > 8192) event = { ...event, message: `[Earlier output omitted from this view]\n${event.message.slice(-8192)}` };
     set((state) => {
       const current = state.runs[event.runId];
       const completed =
@@ -158,7 +159,7 @@ export const useLogsStore = create<LogsState>((set) => ({
             detectedPorts,
             completedAt: completed ? event.timestamp : current.completedAt,
             exitCode: event.exitCode ?? current.exitCode,
-            events: [...current.events, event],
+            events: [...current.events, event].slice(-500),
             updatedAt: event.timestamp,
           }
         : {
@@ -178,14 +179,16 @@ export const useLogsStore = create<LogsState>((set) => ({
             events: [event],
             updatedAt: event.timestamp,
           };
-      return {
-        runs: { ...state.runs, [event.runId]: nextEntry },
-        order: [
+      const order = [
           event.runId,
           ...state.order.filter((runId) => runId !== event.runId),
-        ].slice(0, 18),
+        ].slice(0, 18);
+      const allRuns = { ...state.runs, [event.runId]: nextEntry };
+      return {
+        runs: Object.fromEntries(order.flatMap((runId) => allRuns[runId] ? [[runId, allRuns[runId]!]] : [])),
+        order,
         isOpen: state.isOpen,
-        activeRunId: state.activeRunId ?? event.runId,
+        activeRunId: state.activeRunId && order.includes(state.activeRunId) ? state.activeRunId : event.runId,
       };
     });
   },

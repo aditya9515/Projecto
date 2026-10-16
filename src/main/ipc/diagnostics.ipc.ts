@@ -1,9 +1,10 @@
+import { handleTrusted } from "./trustedSender";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-import { app, clipboard, dialog, ipcMain, shell } from "electron";
+import { app, clipboard, dialog, shell } from "electron";
 import { PROTOCOL_VERSION } from "projecto-protocol";
 import {
   DiagnosticCheckResultSchema,
@@ -274,15 +275,15 @@ export function registerDiagnosticsIpc({
     });
   }
 
-  ipcMain.handle("diagnostics:getReport", async () => buildReport());
+  handleTrusted("diagnostics:getReport", async () => buildReport());
 
-  ipcMain.handle("diagnostics:getRunningPorts", async () => getRunningPorts());
+  handleTrusted("diagnostics:getRunningPorts", async () => getRunningPorts());
 
-  ipcMain.handle("diagnostics:copyReport", async () => {
+  handleTrusted("diagnostics:copyReport", async () => {
     clipboard.writeText(stringifyReport(await buildReport()));
   });
 
-  ipcMain.handle("diagnostics:exportReport", async () => {
+  handleTrusted("diagnostics:exportReport", async () => {
     const report = await buildReport();
     const result = await dialog.showSaveDialog({
       title: "Export Projecto diagnostics",
@@ -300,7 +301,7 @@ export function registerDiagnosticsIpc({
     await fs.writeFile(result.filePath, stringifyReport(report), "utf8");
   });
 
-  ipcMain.handle("diagnostics:openAppDataFolder", async () => {
+  handleTrusted("diagnostics:openAppDataFolder", async () => {
     const result = await shell.openPath(app.getPath("userData"));
 
     if (result) {
@@ -308,7 +309,7 @@ export function registerDiagnosticsIpc({
     }
   });
 
-  ipcMain.handle("diagnostics:testEditor", async () => {
+  handleTrusted("diagnostics:testEditor", async () => {
     await settingsStore.getSettings();
     const command = resolveEditorCommand();
     const ok = await commandStarts(command);
@@ -321,7 +322,7 @@ export function registerDiagnosticsIpc({
     });
   });
 
-  ipcMain.handle("diagnostics:testTerminal", async () => {
+  handleTrusted("diagnostics:testTerminal", async () => {
     const command =
       process.platform === "win32"
         ? process.env.ComSpec?.trim() || "cmd.exe"
@@ -340,7 +341,7 @@ export function registerDiagnosticsIpc({
     });
   });
 
-  ipcMain.handle("diagnostics:resetCommandApprovals", async () => {
+  handleTrusted("diagnostics:resetCommandApprovals", async () => {
     await commandSafetyService.resetApprovals();
   });
 }

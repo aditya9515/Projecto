@@ -123,9 +123,7 @@ function shutdownServices(): Promise<void> {
   }
 
   shutdownPromise = (async () => {
-    await runShutdownStep("launcher", () => {
-      launcherService?.stopAllRuns();
-    });
+    await runShutdownStep("launcher", () => launcherService?.stopAllRuns());
     await runShutdownStep("terminal compatibility", async () => {
       await desktopBridgeService?.stop();
     });
@@ -323,7 +321,7 @@ async function bootstrapIpc(
   );
   const settings = await settingsStore.getSettings();
   await syncOpenAtLogin(settings.launchOnStartup);
-  await subscriptionService.initialize();
+  void subscriptionService.initialize().catch((error) => logMainProcessError("Initial subscription verification failed", error));
   await desktopBridgeService.start();
 
   launcherService = new LauncherService(

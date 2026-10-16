@@ -99,13 +99,13 @@ The desktop app checks the hosted Projecto website for update metadata. The webs
 
 Current desktop build target:
 
-- Version: `1.0.7`
-- Installer: `Projecto-1.0.7.Setup.exe`
+- Version: `1.0.8`
+- Installer: `Projecto-1.0.8.Setup.exe`
 - Release feed: GitHub Releases
 - Windows maker: Squirrel.Windows through Electron Forge
 
 The download page and update API are maintained in `D:\projecto_frontend` and
-must be updated when the `1.0.7` artifacts are published.
+must be updated when the `1.0.8` artifacts are published.
 
 ## Setup
 

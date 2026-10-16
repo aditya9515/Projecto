@@ -371,7 +371,7 @@ describe("ProjectStore", () => {
     expect(projects[0]?.launchProfiles[0]?.commandIds).toHaveLength(1);
   });
 
-  it("repairs stale imported profiles so launch defaults to runnable commands", async () => {
+  it("preserves explicitly disabled commands when repairing imported profiles", async () => {
     const userDataDir = await createUserDataDir();
     const workspace = await createWorkspace("repair");
     const store = new ProjectStore(
@@ -456,14 +456,12 @@ describe("ProjectStore", () => {
 
     const projects = await store.getProjects();
 
-    expect(projects[0]?.commands[0]?.runOnLaunch).toBe(true);
-    expect(projects[0]?.launchProfiles[0]?.commandIds).toEqual(["command-1"]);
-    expect(projects[0]?.launchProfiles[0]?.browserUrls).toEqual([
-      "http://localhost:5173",
-    ]);
+    expect(projects[0]?.commands[0]?.runOnLaunch).toBe(false);
+    expect(projects[0]?.launchProfiles[0]?.commandIds).toEqual([]);
+    expect(projects[0]?.launchProfiles[0]?.browserUrls).toEqual([]);
   });
 
-  it("repairs Python run-app imports into default launch profiles", async () => {
+  it("preserves explicitly disabled Python commands without synthesizing a profile", async () => {
     const userDataDir = await createUserDataDir();
     const workspace = await createWorkspace("repair-python");
     const store = new ProjectStore(
@@ -547,15 +545,10 @@ describe("ProjectStore", () => {
       }),
       expect.objectContaining({
         id: "run-1",
-        runOnLaunch: true,
+        runOnLaunch: false,
       }),
     ]);
-    expect(projects[0]?.launchProfiles[0]).toEqual(
-      expect.objectContaining({
-        name: "Default Launch",
-        commandIds: ["run-1"],
-      }),
-    );
+    expect(projects[0]?.launchProfiles).toEqual([]);
   });
 
   it("falls back to local project details when the remote project list endpoint is unavailable", async () => {

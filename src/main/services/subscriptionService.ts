@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import os from "node:os";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
@@ -20,6 +21,7 @@ const AUTO_REAUTH_COOLDOWN_MS = 30_000;
 type DesktopDevicePlatform = "windows" | "macos" | "linux";
 
 type RemoteSubscriptionSnapshot = {
+  userId?: string;
   plan?: SubscriptionState["plan"];
   status?: SubscriptionState["status"];
   email?: string;
@@ -62,6 +64,7 @@ const ExchangeResponseSchema = z.object({
 
 const VerifyResponseSchema = z
   .object({
+    userId: z.string().min(1).optional(),
     plan: SubscriptionStateSchema.shape.plan,
     status: SubscriptionStateSchema.shape.status,
     email: z.string().email().optional(),
@@ -168,6 +171,7 @@ export class SubscriptionService {
   private readonly webOrigin: string;
   private verificationTimer: NodeJS.Timeout | null = null;
   private lastDesktopLoginOpenedAt = 0;
+  private pendingLogin?: { state: string; verifier: string; expiresAt: number };
 
   constructor(private readonly options: SubscriptionServiceOptions) {
     this.billingUrl = resolveBillingUrl(options.billingUrl);
@@ -189,15 +193,15 @@ export class SubscriptionService {
       return;
     }
 
+    this.startPeriodicVerification();
     try {
       await this.refreshSubscription({
-        broadcast: "none",
+        broadcast: "silent",
         emitFailureEvent: false,
         autoReauthenticate: true,
       });
     } catch (error) {
       if (!shouldResetDesktopSession(error)) {
-        this.stopPeriodicVerification();
         this.emitEvent({
           type: "subscription-refresh-failed",
           message:
@@ -325,6 +329,7 @@ export class SubscriptionService {
       );
       const response = VerifyResponseSchema.parse(payload);
       const subscription = await this.applyRemoteSubscriptionSnapshot({
+        userId: response.userId ?? current.state.userId,
         plan: response.plan,
         status: response.status,
         email: response.email ?? current.state.email,
@@ -394,6 +399,10 @@ export class SubscriptionService {
       return false;
     }
 
+    if (url.protocol === "projecto:" && url.hostname === "auth" && url.pathname === "/start") {
+      if (Date.now() - this.lastDesktopLoginOpenedAt >= AUTO_REAUTH_COOLDOWN_MS) await this.openDesktopLogin();
+      return true;
+    }
     if (
       url.protocol !== "projecto:" ||
       url.hostname !== "auth" ||
@@ -406,6 +415,15 @@ export class SubscriptionService {
     const state = url.searchParams.get("state")?.trim();
     const token = url.searchParams.get("token")?.trim();
     const callbackCredential = code ?? token;
+
+    const pending = this.pendingLogin;
+    if (!code || !state || !pending || pending.expiresAt < Date.now() ||
+      Buffer.byteLength(state) !== Buffer.byteLength(pending.state) ||
+      !timingSafeEqual(Buffer.from(state), Buffer.from(pending.state))) {
+      this.emitEvent({ type: "auth-failed", message: "This sign-in was not initiated by this Projecto window or has expired. Start sign-in from Projecto again." });
+      return true;
+    }
+    this.pendingLogin = undefined;
 
     if (!callbackCredential) {
       this.emitEvent({
@@ -422,6 +440,7 @@ export class SubscriptionService {
           ? {
               code,
               state,
+              codeVerifier: pending.verifier,
             }
           : {
               token: callbackCredential,
@@ -440,6 +459,7 @@ export class SubscriptionService {
       }
 
       const subscription = mergeSubscriptionState(current.state, {
+        userId: response.user.uid,
         plan: response.subscription.plan,
         status: response.subscription.status,
         email: response.user.email ?? current.state.email,
@@ -497,6 +517,11 @@ export class SubscriptionService {
   private getDesktopLoginUrl(): string {
     const url = new URL("/desktop-login", this.webOrigin);
     url.searchParams.set("source", "desktop");
+    const verifier = randomBytes(32).toString("base64url");
+    const state = randomBytes(24).toString("base64url");
+    this.pendingLogin = { state, verifier, expiresAt: Date.now() + 5 * 60_000 };
+    url.searchParams.set("desktopState", state);
+    url.searchParams.set("codeChallenge", createHash("sha256").update(verifier).digest("base64url"));
     return url.toString();
   }
 
@@ -546,6 +571,7 @@ export class SubscriptionService {
       method: "POST",
       headers: this.buildHeaders(record),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
     });
 
     return this.parseResponse(response);

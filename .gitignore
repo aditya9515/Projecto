@@ -90,3 +90,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# Local release tooling and verification results
+.release-work/

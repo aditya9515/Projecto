@@ -1,4 +1,5 @@
-import { ipcMain } from "electron";
+import { handleTrusted } from "./trustedSender";
+
 
 import { ActivityStore } from "../services/activityStore";
 import { ProjectStore } from "../services/projectStore";
@@ -12,7 +13,7 @@ export function registerInsightsIpc({
   activityStore,
   projectStore,
 }: RegisterInsightsIpcOptions): void {
-  ipcMain.handle("insights:getUsageStats", async () => {
+  handleTrusted("insights:getUsageStats", async () => {
     try {
       const projects = await projectStore.getProjects({
         persistLocalDetails: false,

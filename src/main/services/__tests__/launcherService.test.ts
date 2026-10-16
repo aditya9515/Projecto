@@ -591,7 +591,7 @@ describe("LauncherService", () => {
     );
   });
 
-  it("clears stale OS terminal mappings when the window cannot be revealed", async () => {
+  it("keeps the mapping when a window cannot be revealed", async () => {
     terminalSessionStore.getSessions.mockResolvedValue([
       {
         projectId: project.id,
@@ -612,8 +612,8 @@ describe("LauncherService", () => {
 
     await expect(
       launcherService.revealProjectTerminal(project.id),
-    ).rejects.toThrow("mapped OS terminal could not be found");
-    expect(terminalSessionStore.clearSession).toHaveBeenCalledWith(project.id);
+    ).rejects.toThrow("mapped OS terminal could not be focused");
+    expect(terminalSessionStore.clearSession).not.toHaveBeenCalled();
   });
 
   it("stops a mapped OS project session through Projecto", async () => {
@@ -701,7 +701,7 @@ describe("LauncherService", () => {
     expect(terminalSessionStore.clearSession).toHaveBeenCalledWith(project.id);
     expect(commandRunner.revealExternalRun).not.toHaveBeenCalled();
   });
-  it("treats a missing mapped OS terminal as an already-stopped project", async () => {
+  it("retains a mapped session when stopping its terminal cannot be confirmed", async () => {
     const session: ProjectTerminalSession = {
       projectId: project.id,
       projectName: project.name,
@@ -724,11 +724,11 @@ describe("LauncherService", () => {
 
     await expect(
       launcherService.stopProjectTerminal(project.id),
-    ).resolves.toBe(true);
-    expect(terminalSessionStore.clearSession).toHaveBeenCalledWith(project.id);
-    expect(commandRunner.clearExternalRunState).toHaveBeenCalledWith('run-1');
+    ).resolves.toBe(false);
+    expect(terminalSessionStore.clearSession).not.toHaveBeenCalled();
+    expect(commandRunner.clearExternalRunState).not.toHaveBeenCalled();
   });
-  it("allows relaunch after a stale OS terminal reveal clears a ready session", async () => {
+  it("retains ownership and prevents relaunch when window focus fails", async () => {
     const storedSessions = mockStoredTerminalSessions([
       {
         projectId: project.id,
@@ -776,13 +776,12 @@ describe("LauncherService", () => {
     commandRunner.revealExternalRun.mockResolvedValue(false);
     await expect(
       launcherService.revealProjectTerminal(project.id),
-    ).rejects.toThrow("mapped OS terminal could not be found");
-    expect(storedSessions.sessions).toEqual([]);
+    ).rejects.toThrow("mapped OS terminal could not be focused");
+    expect(storedSessions.sessions).toHaveLength(1);
 
     commandRunner.runCommand.mockClear();
-    await launcherService.launchProfile(project.id, "profile-1");
-
-    expect(commandRunner.runCommand).toHaveBeenCalledTimes(1);
+    await expect(launcherService.launchProfile(project.id, "profile-1")).rejects.toThrow();
+    expect(commandRunner.runCommand).not.toHaveBeenCalled();
   });
 
   it("persists ready and failed terminal-session transitions from run status events", async () => {
@@ -1117,7 +1116,25 @@ describe("LauncherService", () => {
     expect(commandRunner.runCommand).not.toHaveBeenCalled();
   });
 
-  it("clears stale stopping sessions before enforcing concurrent launch limits", async () => {
+  it("reserves a project before asynchronous launch checks", async () => {
+    const service = createLauncherService();
+    const pending = service.runCommand(project.id, "command-1");
+    await expect(service.runCommand(project.id, "command-1")).rejects.toThrow();
+    await pending;
+    expect(commandRunner.runCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a successful launch successful when remote history is unavailable", async () => {
+    projectStore.updateProject.mockRejectedValueOnce(new Error("backend unavailable"));
+    const service = createLauncherService();
+    const events: unknown[] = [];
+    service.onRunEvent((event) => events.push(event));
+    await expect(service.runCommand(project.id, "command-1")).resolves.toMatchObject({ runId: "run-1" });
+    expect(events).toContainEqual(expect.objectContaining({ kind: "system", message: expect.stringContaining("history") }));
+    expect(commandRunner.stopRun).not.toHaveBeenCalled();
+  });
+
+  it("counts stopping sessions until the terminal confirms it has stopped", async () => {
     subscriptionService.getSubscriptionState.mockResolvedValue({
       plan: "free",
       status: "active",
@@ -1151,12 +1168,10 @@ describe("LauncherService", () => {
     ]);
     const launcherService = createLauncherService();
 
-    await launcherService.launchProfile(project.id, "profile-1");
-
-    expect(terminalSessionStore.clearSession).toHaveBeenCalledWith(
-      "project-2",
-    );
-    expect(commandRunner.runCommand).toHaveBeenCalledTimes(1);
+    await expect(launcherService.launchProfile(project.id, "profile-1"))
+      .rejects.toThrow("UPGRADE_REQUIRED:concurrentLaunches");
+    expect(terminalSessionStore.clearSession).not.toHaveBeenCalled();
+    expect(commandRunner.runCommand).not.toHaveBeenCalled();
   });
 
   it("stops started background runs when a later profile command fails", async () => {

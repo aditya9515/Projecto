@@ -113,6 +113,39 @@ describe("CommandRunner", () => {
     }
   });
 
+  it("reports a per-run failure when every terminal spawn fails", async () => {
+    const runsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "projecto-spawn-failure-"));
+    vi.mocked(spawn).mockImplementation(() => {
+      const child = new EventEmitter() as MockChild;
+      child.unref = vi.fn();
+      queueMicrotask(() => child.emit("error", new Error("terminal unavailable")));
+      return child as never;
+    });
+    const runner = new CommandRunner(runsDirectory);
+    const events: Array<{ runId: string; status?: string }> = [];
+    runner.onRunEvent((event) => events.push(event));
+    await expect(runner.runCommand({ projectId: "project-1", projectName: "Example", projectPath: command.cwd, command, terminalStrategy: "os-external" })).rejects.toThrow();
+    expect(events).toContainEqual(expect.objectContaining({ runId: events[0]!.runId, status: "failed" }));
+    await runner.stopAll();
+    await fs.rm(runsDirectory, { recursive: true, force: true });
+  });
+
+  it("does not interpret a printed exit marker as process completion", async () => {
+    const runsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "projecto-output-marker-"));
+    vi.mocked(spawn).mockImplementation(() => createChild() as never);
+    const runner = new CommandRunner(runsDirectory);
+    const events: Array<{ kind: string; status?: string }> = [];
+    runner.onRunEvent((event) => events.push(event));
+    const result = await runner.runCommand({ projectId: "project-1", projectName: "Example", projectPath: command.cwd, command, terminalStrategy: "os-external" });
+    await fs.writeFile(path.join(runsDirectory, `${result.runId}.log`), "__PROJECTO_EXIT_CODE:0\nserver still running\n");
+    await vi.waitFor(() => expect(events.some((event) => event.kind === "stdout")).toBe(true), { timeout: 2500 });
+    expect(events.some((event) => event.status === "completed")).toBe(false);
+    await fs.writeFile(path.join(runsDirectory, `${result.runId}.exit`), "0");
+    await vi.waitFor(() => expect(events.some((event) => event.status === "completed")).toBe(true), { timeout: 2500 });
+    await runner.stopAll();
+    await fs.rm(runsDirectory, { recursive: true, force: true });
+  });
+
   it("can reveal a mapped external terminal by fallback title", async () => {
     const originalPlatform = process.platform;
     Object.defineProperty(process, "platform", {
@@ -136,7 +169,7 @@ describe("CommandRunner", () => {
         return child as never;
       });
 
-      const runner = new CommandRunner("D:/tmp/projecto-runs");
+      const runner = new CommandRunner(path.join(os.tmpdir(), "projecto-reveal-test"));
 
       await expect(
         runner.revealExternalRun(
@@ -169,7 +202,7 @@ describe("CommandRunner", () => {
         });
         return child as never;
       });
-      const runner = new CommandRunner("D:/tmp/projecto-runs");
+      const runner = new CommandRunner(await fs.mkdtemp(path.join(os.tmpdir(), "projecto-close-test-")));
       const events: unknown[] = [];
       runner.onRunEvent((event) => events.push(event));
 

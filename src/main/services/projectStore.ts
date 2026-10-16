@@ -1,5 +1,5 @@
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
@@ -29,6 +29,7 @@ import {
 } from "../types/shared";
 import { FileSystemService } from "./fileSystemService";
 import { DesktopApiError, SubscriptionService } from "./subscriptionService";
+import { SerialTaskQueue } from "../../shared/serialTaskQueue";
 
 const RemoteProjectDirectorySchema = z.object({
   id: z.string().min(1),
@@ -227,7 +228,7 @@ function repairCommands(details: LocalProjectDetails): LaunchCommand[] {
 
   return details.commands.map((command) => ({
     ...command,
-    runOnLaunch: command.runOnLaunch || shouldRunOnLaunch(command),
+    runOnLaunch: command.runOnLaunch,
   }));
 }
 
@@ -449,19 +450,45 @@ function mapRemoteProjectCodeToUpgradeReason(error: DesktopApiError): Error {
 }
 
 export class ProjectStore {
-  private readonly detailsFilePath: string;
+  private detailsFilePath: string;
+  private accountScoped = false;
+  private readonly tasks = new SerialTaskQueue();
+  private storeAccountId?: string;
   private readonly legacyFilePath: string;
 
   constructor(
     private readonly fileSystemService: FileSystemService,
     private readonly subscriptionService: SubscriptionService,
-    userDataPath: string,
+    private readonly userDataPath: string,
   ) {
     this.detailsFilePath = path.join(userDataPath, "project-details.json");
     this.legacyFilePath = path.join(userDataPath, "projects.json");
   }
 
   async getProjects(options?: {
+    persistLocalDetails?: boolean;
+    syncSubscription?: boolean;
+  }): Promise<Project[]> {
+    return this.withStore(() => this.getProjectsInternal(options));
+  }
+
+  private withStore<T>(operation: () => Promise<T>): Promise<T> {
+    return this.tasks.run(async () => {
+      const state = await this.subscriptionService.getSubscriptionState();
+      this.storeAccountId = state.userId;
+      this.accountScoped = Boolean(state.userId);
+      this.detailsFilePath = state.userId
+        ? path.join(this.userDataPath, "accounts", createHash("sha256").update(state.userId).digest("hex"), "project-details.json")
+        : path.join(this.userDataPath, "project-details.json");
+      const result = await operation();
+      if ((await this.subscriptionService.getSubscriptionState()).userId !== state.userId) {
+        throw new Error("The signed-in account changed. Retry this operation.");
+      }
+      return result;
+    });
+  }
+
+  private async getProjectsInternal(options?: {
     persistLocalDetails?: boolean;
     syncSubscription?: boolean;
   }): Promise<Project[]> {
@@ -496,7 +523,16 @@ export class ProjectStore {
       ...remoteProjects.projects,
       ...remoteProjects.archivedProjects,
     ];
-    const details = this.reconcileDetails(localDetails, allRemoteProjects);
+    let candidates = localDetails;
+    if (this.accountScoped && candidates.length === 0) {
+      // Adopt legacy details only for the same remote ID, never by folder alone.
+      try {
+        const legacy = await this.fileSystemService.readJsonFile<unknown>(path.join(this.userDataPath, "project-details.json"));
+        const parsed = LocalProjectDetailsSchema.array().safeParse(legacy);
+        if (parsed.success) candidates = parsed.data.filter((entry) => allRemoteProjects.some((remote) => remote.id === entry.id));
+      } catch { /* A new account need not have any legacy details. */ }
+    }
+    const details = this.reconcileDetails(candidates, allRemoteProjects);
     const hydrated = await Promise.all(
       allRemoteProjects.map((remoteProject) =>
         this.hydrate(
@@ -520,9 +556,13 @@ export class ProjectStore {
   }
 
   async createProject(input: CreateProjectInput): Promise<Project> {
+    return this.withStore(() => this.createProjectInternal(input));
+  }
+
+  private async createProjectInternal(input: CreateProjectInput): Promise<Project> {
     const payload = CreateProjectInputSchema.parse(input);
     const subscription = await this.subscriptionService.getSubscriptionState();
-    const existingProjects = await this.getProjects({
+    const existingProjects = await this.getProjectsInternal({
       persistLocalDetails: false,
       syncSubscription: false,
     });
@@ -554,6 +594,10 @@ export class ProjectStore {
   }
 
   async bulkImportProjects(inputs: CreateProjectInput[]): Promise<Project[]> {
+    return this.withStore(() => this.bulkImportProjectsInternal(inputs));
+  }
+
+  private async bulkImportProjectsInternal(inputs: CreateProjectInput[]): Promise<Project[]> {
     if (inputs.length === 0) {
       return [];
     }
@@ -562,7 +606,7 @@ export class ProjectStore {
       CreateProjectInputSchema.parse(input),
     );
     const subscription = await this.subscriptionService.getSubscriptionState();
-    const existingProjects = await this.getProjects({
+    const existingProjects = await this.getProjectsInternal({
       persistLocalDetails: false,
       syncSubscription: false,
     });
@@ -609,9 +653,13 @@ export class ProjectStore {
   }
 
   async updateProject(id: string, patch: ProjectUpdateInput): Promise<Project> {
+    return this.withStore(() => this.updateProjectInternal(id, patch));
+  }
+
+  private async updateProjectInternal(id: string, patch: ProjectUpdateInput): Promise<Project> {
     const payload = ProjectUpdateSchema.parse(patch);
     const details = await this.loadLocalDetails();
-    const existingProject = await this.getProject(id);
+    const existingProject = (await this.getProjectsInternal()).find((entry) => entry.id === id);
 
     if (!existingProject) {
       throw new Error("Project not found.");
@@ -664,6 +712,10 @@ export class ProjectStore {
   }
 
   async deleteProject(id: string): Promise<void> {
+    return this.withStore(() => this.deleteProjectInternal(id));
+  }
+
+  private async deleteProjectInternal(id: string): Promise<void> {
     try {
       await this.subscriptionService.postAuthenticatedJson(
         "/api/desktop/projects/delete",
@@ -684,13 +736,15 @@ export class ProjectStore {
   }
 
   async toggleFavorite(id: string): Promise<Project> {
-    const project = await this.getProject(id);
+    return this.withStore(async () => {
+    const project = (await this.getProjectsInternal()).find((entry) => entry.id === id);
 
     if (!project) {
       throw new Error("Project not found.");
     }
 
-    return this.updateProject(id, { favorite: !project.favorite });
+    return this.updateProjectInternal(id, { favorite: !project.favorite });
+    });
   }
 
   private async listRemoteProjects(): Promise<
@@ -790,6 +844,7 @@ export class ProjectStore {
       | z.infer<typeof RemoteProjectMutationResponseSchema>
       | z.infer<typeof RemoteBulkImportResponseSchema>,
   ): Promise<void> {
+    if ((await this.subscriptionService.getSubscriptionState()).userId !== this.storeAccountId) return;
     if (!response.subscription && !response.entitlements) {
       return;
     }
@@ -818,7 +873,7 @@ export class ProjectStore {
       const code = (error as NodeJS.ErrnoException).code;
 
       if (code === "ENOENT") {
-        const migrated = await this.loadLegacyDetails();
+        const migrated = this.accountScoped ? [] : await this.loadLegacyDetails();
         if (shouldRepair) {
           await this.persistLocalDetails(migrated);
         }
@@ -925,9 +980,7 @@ export class ProjectStore {
     return remoteProjects.map((remoteProject) => {
       const existing = details.find(
         (entry) =>
-          entry.id === remoteProject.id ||
-          normalizeProjectPath(entry.path) ===
-            normalizeProjectPath(remoteProject.directoryPath),
+          entry.id === remoteProject.id,
       );
 
       return sanitizeCommandReferences(
@@ -947,9 +1000,7 @@ export class ProjectStore {
     return (
       details.find(
         (entry) =>
-          entry.id === remoteProject.id ||
-          normalizeProjectPath(entry.path) ===
-            normalizeProjectPath(remoteProject.directoryPath),
+          entry.id === remoteProject.id,
       ) ??
       buildDefaultLocalDetails({
         id: remoteProject.id,

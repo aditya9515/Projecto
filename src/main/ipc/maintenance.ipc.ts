@@ -1,14 +1,15 @@
-import { ipcMain } from "electron";
+import { handleTrusted } from "./trustedSender";
+
 
 import { MaintenanceService } from "../services/maintenanceService";
 
 export function registerMaintenanceIpc(
   maintenanceService: MaintenanceService,
 ): void {
-  ipcMain.handle("maintenance:getStatus", async () =>
+  handleTrusted("maintenance:getStatus", async () =>
     maintenanceService.getStatus(),
   );
-  ipcMain.handle("maintenance:cleanup", async () =>
+  handleTrusted("maintenance:cleanup", async () =>
     maintenanceService.runCleanup("manual"),
   );
 }

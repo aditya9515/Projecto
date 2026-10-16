@@ -46,12 +46,12 @@ export function buildWorkspacePresets(project: Project): WorkspacePreset[] {
     },
     {
       id: "preset-full",
-      name: "Install + Launch",
+      name: "Full Dev Workspace",
       description:
-        "Run every saved project command, then open the browser and editor.",
+        "Run all commands enabled for profile launch, then open the browser and editor. Run dependency installation separately first.",
       build: (entry) => ({
         id: crypto.randomUUID(),
-        name: "Install + Launch",
+        name: "Full Dev Workspace",
         openEditor: true,
         openFolder: true,
         openBrowser: entry.suggestedBrowserUrls.length > 0,

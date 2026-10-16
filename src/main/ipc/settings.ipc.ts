@@ -1,4 +1,5 @@
-import { ipcMain } from "electron";
+import { handleTrusted } from "./trustedSender";
+
 
 import type { AppSettings } from "../types/shared";
 import { AppSettingsUpdateSchema } from "../types/shared";
@@ -8,11 +9,11 @@ export function registerSettingsIpc(
   settingsStore: SettingsStore,
   onSettingsUpdated?: (settings: AppSettings) => Promise<void> | void,
 ): void {
-  ipcMain.handle("settings:getSettings", async () => {
+  handleTrusted("settings:getSettings", async () => {
     return settingsStore.getSettings();
   });
 
-  ipcMain.handle("settings:updateSettings", async (_event, patch) => {
+  handleTrusted("settings:updateSettings", async (_event, patch) => {
     const payload = AppSettingsUpdateSchema.parse(patch);
     const settings = await settingsStore.updateSettings(payload);
     await onSettingsUpdated?.(settings);

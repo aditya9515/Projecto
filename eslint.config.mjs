@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: ['.webpack/**', 'out/**', 'node_modules/**'],
+    ignores: ['.webpack/**', '.release-work/**', 'out/**', 'node_modules/**'],
   },
   {
     files: ['**/*.{js,mjs,cjs,ts,tsx}'],
@@ -39,7 +39,7 @@ export default [
     },
   },
   {
-    files: ['forge.config.js', 'webpack.*.js', 'tailwind.config.js', 'postcss.config.js'],
+    files: ['forge.config.js', 'webpack.*.js', 'tailwind.config.js', 'postcss.config.js', 'vendor/projecto-protocol/index.js'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
     },

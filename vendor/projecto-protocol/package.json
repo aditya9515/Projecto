@@ -1,0 +1,11 @@
+{
+  "name": "projecto-protocol",
+  "version": "0.1.0",
+  "description": "Shared Projecto desktop/editor bridge protocol schemas.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}
