@@ -270,10 +270,8 @@ export class LauncherService {
       : false;
 
     if (!revealed) {
-      await this.clearTerminalSession(projectId);
-      this.stoppingProjectIds.delete(projectId);
       throw new Error(
-        "The mapped OS terminal could not be found. Projecto cleared the stale session; launch the project again to start a fresh terminal.",
+        "The mapped OS terminal could not be focused. Use Stop to check its process before launching another terminal.",
       );
     }
     await this.updateTerminalSession(projectId, {
@@ -610,11 +608,11 @@ export class LauncherService {
     }
 
     if (!stopped && isOsTerminalStrategy(session.terminalStrategy)) {
-      for (const runId of runIds) {
-        await this.commandRunner.clearExternalRunState(runId);
-      }
-      await this.clearTerminalSession(projectId);
-      return true;
+      // A failed window/process operation does not establish that the command exited.
+      await this.updateTerminalSession(projectId, {
+        lastMessage: "The terminal could not be confirmed stopped. Check the terminal and retry Stop.",
+      });
+      return false;
     }
 
     return stopped;
